@@ -4,6 +4,7 @@
 #include <cstdint>      // uint8_t
 #include <cstring>      // memcpy
 #include <stdexcept>    // std::out_of_range
+#include <iterator>
 
 namespace LiliumDB {
 
@@ -15,16 +16,35 @@ public:
         data_(buf),
         size_(size) { }
 
-    uint8_t& at(size_t index);
-    ByteSpan subspan(size_t start, size_t len) const;
-    void write(size_t start, const uint8_t* src, size_t len);
-    void write(size_t start, const ByteView& src);
+    uint8_t&                at(size_t index);
+    ByteSpan                subspan(size_t start, size_t len) const;
+    void                    write(size_t start, const uint8_t* src, size_t len);
+    void                    write(size_t start, const ByteView& src);
 
-    uint8_t* data() const { return data_; }
-    size_t size() const { return size_; }
+    uint8_t*                data() const { return data_; }
+    size_t                  size() const { return size_; }
+
+    using iterator               = uint8_t*;
+    using const_iterator         = const uint8_t*;
+    using reverse_iterator       = std::reverse_iterator<iterator>;
+    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+    iterator                begin()   { return data_; }
+    iterator                end()     { return data_ + size_; }
+    const_iterator          begin()   const { return data_; }
+    const_iterator          end()     const { return data_ + size_; }
+    const_iterator          cbegin()  const { return data_; }
+    const_iterator          cend()    const { return data_ + size_; }
+
+    reverse_iterator        rbegin()        { return reverse_iterator(end()); }
+    reverse_iterator        rend()          { return reverse_iterator(begin()); }
+    const_reverse_iterator  rbegin()  const { return const_reverse_iterator(end()); }
+    const_reverse_iterator  rend()    const { return const_reverse_iterator(begin()); }
+    const_reverse_iterator  crbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator  crend()   const { return const_reverse_iterator(begin()); }
 private:
-    uint8_t* data_;
-    size_t size_;
+    uint8_t*    data_;
+    size_t      size_;
 };
 
 class ByteView {
@@ -36,15 +56,28 @@ public:
         data_(span.data()),
         size_(span.size()) { }
 
-    uint8_t at(size_t index) const;
-    ByteView subview(size_t start, size_t len) const;
-    void read(size_t start, uint8_t* dst, size_t size) const;
+    uint8_t                 at(size_t index) const;
+    ByteView                subview(size_t start, size_t len) const;
+    void                    read(size_t start, uint8_t* dst, size_t size) const;
 
-    const uint8_t* data() const { return data_; }
-    size_t size() const { return size_; }
+    const uint8_t*          data() const { return data_; }
+    size_t                  size() const { return size_; }
+
+    using const_iterator            = const uint8_t*;
+    using const_reverse_iterator    = std::reverse_iterator<const_iterator>;
+
+    const_iterator          begin()   const { return data_; }
+    const_iterator          end()     const { return data_ + size_; }
+    const_iterator          cbegin()  const { return data_; }
+    const_iterator          cend()    const { return data_ + size_; }
+
+    const_reverse_iterator  rbegin()  const { return const_reverse_iterator(end()); }
+    const_reverse_iterator  rend()    const { return const_reverse_iterator(begin()); }
+    const_reverse_iterator  crbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator  crend()   const { return const_reverse_iterator(begin()); }
 private:
-    const uint8_t* data_;
-    size_t size_;
+    const uint8_t*  data_;
+    size_t          size_;
 };
 
 // ByteSpan method definitions
@@ -97,7 +130,7 @@ inline void ByteView::read(size_t start, uint8_t* dst, size_t size) const {
         throw std::out_of_range("size out of range");
 }
 
-};
+} // namespace LiliumDB
 
 
 #endif
