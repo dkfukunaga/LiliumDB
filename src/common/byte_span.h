@@ -4,7 +4,7 @@
 #include <cstdint>      // uint8_t
 #include <cstring>      // memcpy
 #include <stdexcept>    // std::out_of_range
-#include <iterator>
+#include <iterator>     // std::reverse_iterator
 
 namespace LiliumDB {
 
@@ -12,36 +12,36 @@ class ByteView;
 
 class ByteSpan {
 public:
-    ByteSpan(uint8_t* buf, size_t size):
-        data_(buf),
+    ByteSpan(uint8_t* bytes, size_t size):
+        data_(bytes),
         size_(size) { }
 
-    uint8_t&                at(size_t index);
-    ByteSpan                subspan(size_t start, size_t len) const;
-    void                    write(size_t start, const uint8_t* src, size_t len);
-    void                    write(size_t start, const ByteView& src);
+    uint8_t&                        at(size_t offset);
+    ByteSpan                        subspan(size_t start, size_t len) const;
+    void                            write(size_t start, const uint8_t* src, size_t len);
+    void                            write(size_t start, const ByteView& src);
 
-    uint8_t*                data() const { return data_; }
-    size_t                  size() const { return size_; }
+    uint8_t*                        data() const { return data_; }
+    size_t                          size() const { return size_; }
 
-    using iterator               = uint8_t*;
-    using const_iterator         = const uint8_t*;
-    using reverse_iterator       = std::reverse_iterator<iterator>;
-    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+    using iterator                  = uint8_t*;
+    using const_iterator            = const uint8_t*;
+    using reverse_iterator          = std::reverse_iterator<iterator>;
+    using const_reverse_iterator    = std::reverse_iterator<const_iterator>;
 
-    iterator                begin()   { return data_; }
-    iterator                end()     { return data_ + size_; }
-    const_iterator          begin()   const { return data_; }
-    const_iterator          end()     const { return data_ + size_; }
-    const_iterator          cbegin()  const { return data_; }
-    const_iterator          cend()    const { return data_ + size_; }
+    iterator                        begin()   { return data_; }
+    iterator                        end()     { return data_ + size_; }
+    const_iterator                  begin()   const { return data_; }
+    const_iterator                  end()     const { return data_ + size_; }
+    const_iterator                  cbegin()  const { return data_; }
+    const_iterator                  cend()    const { return data_ + size_; }
 
-    reverse_iterator        rbegin()        { return reverse_iterator(end()); }
-    reverse_iterator        rend()          { return reverse_iterator(begin()); }
-    const_reverse_iterator  rbegin()  const { return const_reverse_iterator(end()); }
-    const_reverse_iterator  rend()    const { return const_reverse_iterator(begin()); }
-    const_reverse_iterator  crbegin() const { return const_reverse_iterator(end()); }
-    const_reverse_iterator  crend()   const { return const_reverse_iterator(begin()); }
+    reverse_iterator                rbegin()        { return reverse_iterator(end()); }
+    reverse_iterator                rend()          { return reverse_iterator(begin()); }
+    const_reverse_iterator          rbegin()  const { return const_reverse_iterator(end()); }
+    const_reverse_iterator          rend()    const { return const_reverse_iterator(begin()); }
+    const_reverse_iterator          crbegin() const { return const_reverse_iterator(end()); }
+    const_reverse_iterator          crend()   const { return const_reverse_iterator(begin()); }
 private:
     uint8_t*    data_;
     size_t      size_;
@@ -49,14 +49,14 @@ private:
 
 class ByteView {
 public:
-    ByteView(const uint8_t* buf, size_t size):
-        data_(buf),
+    ByteView(const uint8_t* bytes, size_t size):
+        data_(bytes),
         size_(size) { }
     ByteView(const ByteSpan& span):
         data_(span.data()),
         size_(span.size()) { }
 
-    uint8_t                 at(size_t index) const;
+    uint8_t                 at(size_t offset) const;
     ByteView                subview(size_t start, size_t len) const;
     void                    read(size_t start, uint8_t* dst, size_t size) const;
 
@@ -82,11 +82,11 @@ private:
 
 // ByteSpan method definitions
 
-inline uint8_t& ByteSpan::at(size_t index) {
-    if (index < size_)
-        return data_[index];
+inline uint8_t& ByteSpan::at(size_t offset) {
+    if (offset < size_)
+        return data_[offset];
     else
-        throw std::out_of_range("index out of range");
+        throw std::out_of_range("offset out of range");
 }
 
 inline ByteSpan ByteSpan::subspan(size_t start, size_t len) const {
@@ -109,11 +109,11 @@ inline void ByteSpan::write(size_t start, const ByteView& src) {
 
 // ByteView method defintions
 
-inline uint8_t ByteView::at(size_t index) const {
-    if (index < size_)
-        return data_[index];
+inline uint8_t ByteView::at(size_t offset) const {
+    if (offset < size_)
+        return data_[offset];
     else
-        throw std::out_of_range("index out of range");
+        throw std::out_of_range("offset out of range");
 }
 
 inline ByteView ByteView::subview(size_t start, size_t len) const {
