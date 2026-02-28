@@ -1,23 +1,36 @@
 #ifndef LILIUMDB_FILE_FORMAT_H
 #define LILIUMDB_FILE_FORMAT_H
 
+#include <cstdint>
 #include <array>
+#include <limits>
 
-#include "common.h"
+#include "types.h"
 
 namespace LiliumDB {
 
-//  CAT_CAFE LDB\0
-static constexpr std::array<uint8_t, 8> MAGIC = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
-static constexpr size_t FILE_HEADER_SIZE = 64;
-static constexpr size_t PAGE_HEADER_SIZE = 8;
-static constexpr size_t BRANCH_HEADER_SIZE = 4;
-static constexpr size_t LEAF_HEADER_SIZE = 8;
-static constexpr size_t PAGE_FOOTER_SIZE = 4;
-static constexpr size_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
-static constexpr size_t BRANCH_OVERHEAD = PAGE_OVERHEAD + BRANCH_HEADER_SIZE;
-static constexpr size_t LEAF_OVERHEAD = PAGE_OVERHEAD + LEAF_HEADER_SIZE;
-static constexpr size_t PAGE_ZERO_OFFSET = PAGE_HEADER_SIZE;
+//  magic bytes: CAT_CAFE LDB\0
+inline constexpr std::array<uint8_t, 8> MAGIC = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
+
+// page size
+inline constexpr uint16_t PAGE_SIZE = 4096;
+
+// header sizes
+inline constexpr uint16_t FILE_HEADER_SIZE = 64;
+inline constexpr uint16_t PAGE_HEADER_SIZE = 8;
+inline constexpr uint16_t BRANCH_HEADER_SIZE = 4;
+inline constexpr uint16_t LEAF_HEADER_SIZE = 8;
+inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
+inline constexpr uint16_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
+inline constexpr uint16_t BRANCH_OVERHEAD = PAGE_OVERHEAD + BRANCH_HEADER_SIZE;
+inline constexpr uint16_t LEAF_OVERHEAD = PAGE_OVERHEAD + LEAF_HEADER_SIZE;
+
+// page 0 offset to usable data region
+inline constexpr PageOffset PAGE_ZERO_OFFSET = FILE_HEADER_SIZE;
+
+// sentinel values for invalid offsets
+inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
+inline constexpr SlotNum INVALID_SLOT = std::numeric_limits<SlotNum>::max();
 
 enum class PageType : uint8_t {
     Invalid = 0,    // invalid/unitialized
@@ -48,7 +61,7 @@ struct PageHeader {
     uint8_t     level;          // used by BPTree, 0 = leaf
     uint8_t     reserved;
     uint16_t    slot_count;
-    uint16_t    free_offset;
+    PageOffset  free_offset;
 };
 
 static_assert(sizeof(PageHeader) == PAGE_HEADER_SIZE);
