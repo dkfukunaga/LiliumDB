@@ -2,6 +2,7 @@
 #define LILIUMDB_TYPES_H
 
 #include <cstdint>
+#include <string>
 
 namespace LiliumDB {
 
@@ -24,9 +25,18 @@ struct RID {
 
 class Status {
 public:
-    enum Code { Ok, ErrNotFound, ErrIO, ErrCorrupt } code;
+    enum Code {
+        Ok,
+        NewFile,
+        ErrFile,
+        ErrCannotOpen,
+        ErrIO,
+        ErrCorrupt,
+        Error
+    } code;
 
     Status(Code c, const char* msg = nullptr): code(c), message_(msg) { }
+    Status(Code c, std::string msg): Status(c, msg.c_str()) { }
 
     explicit operator bool() const { return code == Ok; }
 
