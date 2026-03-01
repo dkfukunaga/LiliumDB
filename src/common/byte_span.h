@@ -100,14 +100,14 @@ inline void ByteSpan::write(size_t start, const uint8_t* src, size_t len) {
     if (start <= size_ && len <= size_ - start)
         memcpy(data_ + start, src, len);
     else
-        throw std::out_of_range("source out of range");
+        throw std::out_of_range("destination out of range");
 }
 
 inline void ByteSpan::write(size_t start, const ByteView& src) {
     write(start, src.data(), src.size());
 }
 
-// ByteView method defintions
+// ByteView method definitions
 
 inline uint8_t ByteView::at(size_t offset) const {
     if (offset < size_)
