@@ -45,7 +45,7 @@ struct FileHeader {
     uint16_t    file_flags;
     uint8_t     version_major;
     uint8_t     version_minor;
-    uint32_t    num_pages;
+    uint32_t    page_count;
     uint64_t    file_created;
     uint64_t    last_modified;
     PageNum     freespace_head;
