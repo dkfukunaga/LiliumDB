@@ -1,16 +1,17 @@
-#ifndef LILIUMDB_FILE_MANAGER_H
-#define LILIUMDB_FILE_MANAGER_H
+#ifndef LILIUMDB_PAGE_IO_H
+#define LILIUMDB_PAGE_IO_H
 
 #include "common/types.h"
+#include "common/status.h"
 #include "common/byte_span.h"
 
 namespace LiliumDB {
 
 enum class OpenMode { ReadWrite, ReadOnly };
 
-class FileManager {
+class PageIO {
 public:
-    virtual ~FileManager() = default;
+    virtual ~PageIO() = default;
     virtual Status open(std::string_view path, OpenMode mode = OpenMode::ReadWrite) = 0;
     virtual Status close() = 0;
     virtual Status readPage(PageNum page, ByteSpan dst) = 0;
