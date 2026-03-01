@@ -1,0 +1,192 @@
+
+
+query/      — processes queries
+catalog/    — knows what tables and schemas exist
+access/     — accesses the raw data (records, indexes, tree structures)
+pager/      — manages pages in memory and on disk
+storage/    — raw file I/O
+common/     — shared utilities
+
+
+
+┌─────────────────────────────────────────────────┐
+│                 QueryProcessor                  │
+│          parse, plan, execute queries           │
+│         Parser, Planner, Executor               │
+└─────────────────────────┬───────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────┐
+│                   Catalog                       │
+│     TableDef, ColumnDef, Schema, CRUD           │
+│              SystemCatalog                      │
+└────────────────┬─────────────────┬──────────────┘
+                 │                 │
+┌────────────────▼──────┐   ┌──────▼────────────────┐
+│      RecordStore      │   │       Index           │
+│  slots, null bitmaps  │   │  key → RID mappings   │
+│  record layout        │   │  insertEntry          │
+│  serialize/deserialize│   │  deleteEntry, scan    │
+│                       │   │    BTreeIndex         │
+└────────────┬──────────┘   └─────────┬─────────────┘
+             │                        │
+             └────────────┬───────────┘
+                          │
+┌─────────────────────────▼───────────────────────┐
+│                    BPTree                       │
+│         splitting, merging, traversal,          │
+│         key comparison, page navigation         │
+└─────────────────────────┬───────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────┐
+│                     Pager                       │
+│         buffer pool, dirty tracking,            │
+│              LRU eviction policy                │
+│                   LRUPager                      │
+└─────────────────────────┬───────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────┐
+│                    PageIO                       │
+│       open/close files, readPage/writePage      │
+│              raw byte I/O only                  │
+│                 StdPageIO                       │
+└─────────────────────────┬───────────────────────┘
+                          │
+                         disk
+
+
+
+src/
+    common/
+        types.h                 — PageNum, SlotNum, RID, and other simple aliases
+        status.h                — Status class
+        byte_span.h             — ByteSpan, ByteView
+        file_format.h           — PAGE_SIZE, magic bytes, header layout constants
+    storage/
+        page_io.h               — interface
+        std_page_io.h           — fstream PageIO
+        std_page_io.cpp
+    pager/
+        pager.h                 — interface
+        lru_pager.h             — LRU Pager
+        lru_pager.cpp
+    access/
+        record_store.h          — RecordStore
+        record_store.cpp
+        index.h                 — Index interface
+        btree_index.h           — B+ Tree Index
+        btree_index.cpp
+        btree.h                 — B+ Tree
+        btree.cpp
+    catalog/
+        catalog.h               — Catalog interface
+        system_catalog.h
+        system_catalog.cpp
+    query/
+        parser.h
+        parser.cpp
+        planner.h
+        planner.cpp
+        executor.h
+        executor.cpp
+
+
+POSIXPageIO         — concrete (open/fsync, Linux/macOS)
+WindowsPageIO       — concrete (CreateFile/FlushFileBuffers)
+
+
+
+
+
+
+
+
+Pager
+
+fetchPage(PageNum)      — get a page, pinning it in the buffer pool
+unpinPage(PageNum)      — release the pin after you're done
+newPage()               — allocate a new page, returns pinned page
+deletePage(PageNum)     — mark a page for deletion
+flushPage(PageNum)      — force a specific dirty page to disk
+flushAll()              — flush all dirty pages
+
+
+
+
+
+
+
+
+================================================================================
+
+
+
+
+
+
+FieldDef    — primitive field type descriptor
+ColumnDef   — schema-level column with index, offset, constraints
+Schema      — ordered ColumnDefs with precomputed layout
+TableDef    — table name, OID, Schema, file reference
+Row         — vector<Value> plus Schema reference
+Value       — variant<monostate, int32_t, float, string>
+RID         — pageNum + slotNum physical locator
+ByteSpan    — non-owning writable byte buffer (internal)
+ByteView    — non-owning read-only byte buffer (internal)
+DBError     — error return code enum
+
+
+
+
+
+SYS_TABLES
+==========
+TABLE_ID
+TABLE_NAME
+TABLE_TYPE
+TABLE_ROOT
+
+SYS_COLUMNS
+===========
+COLUMN_ID
+COLUMN_NAME
+TABLE_ID
+COLUMN_INDEX
+DATATYPE
+IS_NULLABLE
+COLUMN_DEFAULT
+
+
+
+    File:   database.db
+   Range:   0x00000000 ~ 0x00000FFF
+================================================================================
+|Address:|   0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F  |     ASCII:     |
+================================================================================
+|00000000|  CA 70 CA FE 4C 44 42 00  00 00 01 00 02 00 00 00  |.p..LDB.........|
+|00000010|  01 00 00 00 FF FF FF FF  00 00 00 00 31 2D 0B 00  |............1-..|
+|00000020|  00 00 00 00 31 2D 0B 00  00 00 00 00 00 00 00 00  |....1-..........|
+|00000030|  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*
+|00000FF0|  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+================================================================================
+
+CA 70 CA FE 4C 44 42 00 — magic bytes, LDB\0 visible in ASCII sidebar
+00 00                   — flags, none set
+01                      — version major 1
+00                      — version minor 0
+02 00 00 00             — num_pages = 2 (little-endian)
+01 00 00 00             — catalog_root = page 1
+FF FF FF FF             — free_list = INVALID_PAGE
+00 00 00 00 31 2D 0B 00 — file_created timestamp
+00 00 00 00 31 2D 0B 00 — last_modified timestamp (same, just created)
+
+24 bytes of 00 reserved padding
+remaining 4032 bytes zeroed, compressed to *
+
+
+
+
+
+
+
+
