@@ -14,18 +14,18 @@ public:
         ErrIO,
         ErrCorrupt,
         Error
-    } code;
+    };
 
-    Status(Code c, const char* msg = nullptr): code(c), message_(msg) { }
-    Status(Code c, std::string msg): Status(c, msg.c_str()) { }
+    Status(Code c, std::string msg = ""): code_(c), message_(std::move(msg)) {}
 
-    explicit operator bool() const { return code == Ok; }
+    explicit operator bool() const { return code_ == Ok; }
 
-    const char* message() const { return message_ == nullptr ? "" : message_; }
+    Code code() const { return code_; }
+    const std::string& message() const { return message_; }
 
 private:
-    const char* message_;
-
+    Code code_;
+    std::string message_;
 };
 
 } // namespace LiliumDB
