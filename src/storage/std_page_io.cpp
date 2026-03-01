@@ -8,7 +8,7 @@ StdPageIO::~StdPageIO() { close(); }
 
 Status StdPageIO::open(std::string_view path, OpenMode mode) {
     if (isOpen()) {
-        return Status::fileError("File is already open.");
+        return Status::fileErr("File is already open.");
     }
 
     mode_ = mode;
@@ -22,7 +22,7 @@ Status StdPageIO::open(std::string_view path, OpenMode mode) {
             om = std::ios::binary | std::ios::in;
             break;
         default:
-            return Status::fileError("Unknown open mode.");
+            return Status::fileErr("Unknown open mode.");
     }
 
     file_.open(path.data(), om);
@@ -39,10 +39,10 @@ Status StdPageIO::open(std::string_view path, OpenMode mode) {
     file_.open(path.data(), om);
 
     if (file_.is_open()) {
-        return Status::newFile("New file created.");
+        return Status::newFile();
     }
 
-    return Status::fileError("Failed to open file.");
+    return Status::fileErr("Failed to open file.");
 }
 
 Status StdPageIO::close() {
@@ -53,26 +53,26 @@ Status StdPageIO::close() {
     if (!file_.is_open()) {
         return Status::ok();
     } else {
-        return Status::fileError("An error occurred during or after closing the file.");
+        return Status::fileErr("An error occurred during or after closing the file.");
     }
 }
 
 Status StdPageIO::readPage(PageNum page, ByteSpan dst) {
     if (!isOpen()) {
-        return Status::fileError("Open file before reading.");
+        return Status::fileErr("Open file before reading.");
     }
 
     if (page >= pageCount_) {
-        return Status::ioError("Page number out of bounds.");
+        return Status::ioErr("Page number out of bounds.");
     }
 
     file_.seekg(static_cast<std::streamoff>(page) * PAGE_SIZE);
     if (!file_) {
-        return Status::ioError("Seek failed.");
+        return Status::ioErr("Seek failed.");
     }
     file_.read(reinterpret_cast<char*>(dst.data()), PAGE_SIZE);
     if (!file_) {
-        return Status::ioError("Error on file read.");
+        return Status::ioErr("Error on file read.");
     }
 
     return Status::ok();
@@ -80,23 +80,23 @@ Status StdPageIO::readPage(PageNum page, ByteSpan dst) {
 
 Status StdPageIO::writePage(PageNum page, ByteView src) {
     if (!isOpen()) {
-        return Status::fileError("Open file before writing.");
+        return Status::fileErr("Open file before writing.");
     }
     if (mode_ == OpenMode::ReadOnly) {
-        return Status::fileError("Cannot write to read-only file.");
+        return Status::fileErr("Cannot write to read-only file.");
     }
 
     if (page > pageCount_) { // allow writing to pageCount_ (appending), but not beyond
-        return Status::ioError("Page number out of bounds.");
+        return Status::ioErr("Page number out of bounds.");
     }
 
     file_.seekp(static_cast<std::streamoff>(page) * PAGE_SIZE);
     if (!file_) {
-        return Status::ioError("Seek failed.");
+        return Status::ioErr("Seek failed.");
     }
     file_.write(reinterpret_cast<const char*>(src.data()), PAGE_SIZE);
     if (!file_) {
-        return Status::ioError("Error on file write.");
+        return Status::ioErr("Error on file write.");
     }
     
     if (page == pageCount_) {

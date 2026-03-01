@@ -12,23 +12,24 @@ public:
     enum class Code {
         Ok,
         NewFile,
-        FileError,
-        IOError,
+        FileErr,
+        IOErr,
         Corrupt,
         Error
     };
 
     static Status       ok() noexcept { return Status(Code::Ok); }
-    static Status       newFile(std::string_view msg) { return Status(Code::NewFile, std::string(msg)); }
-    static Status       fileError(std::string_view msg) { return Status(Code::FileError, std::string(msg)); }
-    static Status       ioError(std::string_view msg) { return Status(Code::IOError, std::string(msg)); }
+    static Status       newFile() { return Status(Code::NewFile); }
+    static Status       fileErr(std::string_view msg) { return Status(Code::FileErr, std::string(msg)); }
+    static Status       ioErr(std::string_view msg) { return Status(Code::IOErr, std::string(msg)); }
     static Status       corrupt(std::string_view msg) { return Status(Code::Corrupt, std::string(msg)); }
     static Status       error(std::string_view msg) { return Status(Code::Error, std::string(msg)); }
 
     Code                code() const noexcept { return code_; }
-    const std::string&  message() const { return message_; }
+    const std::string&  message() const noexcept { return message_; }
 
-    bool                isOk() const noexcept { return code_ == Code::Ok; }
+    bool                isSuccess() const noexcept { return code_ == Code::Ok || code_ == Code::NewFile; }
+    bool                isError() const noexcept { return !isSuccess(); }
     bool                is(Code c) const noexcept { return code_ == c; }
 private:
     explicit Status(Code c) noexcept: code_(c) {}
