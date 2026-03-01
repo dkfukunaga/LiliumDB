@@ -2,7 +2,6 @@
 #define LILIUMDB_TYPES_H
 
 #include <cstdint>
-#include <string>
 
 namespace LiliumDB {
 
@@ -16,10 +15,22 @@ struct RID {
     SlotNum slot;
 
     bool operator==(const RID& other) const {
-        return this->page == other.page && this->slot == other.slot;
+        return page == other.page && slot == other.slot;
     }
     bool operator!=(const RID& other) const {
         return !(*this == other);
+    }
+    bool operator<(const RID& other) const {
+        return page < other.page || (page == other.page && slot < other.slot);
+    }
+    bool operator>(const RID& other) const {
+        return page > other.page || (page == other.page && slot > other.slot);
+    }
+    bool operator<=(const RID& other) const {
+        return !(*this > other);
+    }
+    bool operator>=(const RID& other) const {
+        return !(*this < other);
     }
 };
 
