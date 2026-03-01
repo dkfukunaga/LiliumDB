@@ -20,8 +20,8 @@ public:
 
     static Status       ok() noexcept { return Status(Code::Ok); }
     static Status       newFile(std::string_view msg) { return Status(Code::NewFile, std::string(msg)); }
-    static Status       file(std::string_view msg) { return Status(Code::ErrFile, std::string(msg)); }
-    static Status       io(std::string_view msg) { return Status(Code::ErrIO, std::string(msg)); }
+    static Status       fileError(std::string_view msg) { return Status(Code::ErrFile, std::string(msg)); }
+    static Status       ioError(std::string_view msg) { return Status(Code::ErrIO, std::string(msg)); }
     static Status       corrupt(std::string_view msg) { return Status(Code::ErrCorrupt, std::string(msg)); }
     static Status       error(std::string_view msg) { return Status(Code::Error, std::string(msg)); }
 
