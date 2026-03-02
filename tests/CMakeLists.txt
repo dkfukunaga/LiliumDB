@@ -6,7 +6,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(googletest)
 
-enable_testing()
 include(GoogleTest)
 
 add_executable(byte_span_test byte_span_test.cpp)
