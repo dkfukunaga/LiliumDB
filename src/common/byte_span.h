@@ -26,7 +26,7 @@ public:
 
     void                            write(size_t start, const uint8_t* src, size_t len);
     void                            write(size_t start, const ByteView& src);
-    void                            move(size_t to, size_t from, size_t len);
+    void                            copy_within(size_t to, size_t from, size_t len);
 
     uint8_t*                        data() noexcept { return data_; }
     const uint8_t*                  data() const noexcept { return data_; }
@@ -130,7 +130,7 @@ inline void ByteSpan::write(size_t start, const ByteView& src) {
     write(start, src.data(), src.size());
 }
 
-inline void ByteSpan::move(size_t to, size_t from, size_t len) {
+inline void ByteSpan::copy_within(size_t to, size_t from, size_t len) {
     if (to <= size_ && from <= size_ && len <= size_ - to && len <= size_ - from)
         std::memmove(data_ + to, data_ + from, len);
     else
