@@ -40,8 +40,8 @@ public:
     using reverse_iterator          = std::reverse_iterator<iterator>;
     using const_reverse_iterator    = std::reverse_iterator<const_iterator>;
 
-    iterator                        begin()   { return data_; }
-    iterator                        end()     { return data_ + size_; }
+    iterator                        begin()         { return data_; }
+    iterator                        end()           { return data_ + size_; }
     const_iterator                  begin()   const { return data_; }
     const_iterator                  end()     const { return data_ + size_; }
     const_iterator                  cbegin()  const { return data_; }
