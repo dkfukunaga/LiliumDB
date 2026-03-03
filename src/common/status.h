@@ -26,8 +26,8 @@ public:
     Code                code() const noexcept { return code_; }
     const std::string&  message() const noexcept { return message_; }
 
-    bool                isSuccess() const noexcept { return code_ == Code::Ok; }
-    bool                isError() const noexcept { return !isSuccess(); }
+    bool                isOk() const noexcept { return code_ == Code::Ok; }
+    bool                isError() const noexcept { return !isOk(); }
     bool                is(Code c) const noexcept { return code_ == c; }
 private:
     explicit Status(Code c) noexcept: code_(c) {}
