@@ -17,7 +17,7 @@ public:
 
     // Named constructors
     static Result       ok(T value) { return Result(std::move(value)); }
-    static Result       err(Status status) { assert(status.isError()); return Result(std::move(status)); }
+    static Result       err(Status status) { assert(status.isErr()); return Result(std::move(status)); }
 
     // Observers
     bool                isOk()  const noexcept { return std::holds_alternative<T>(data_); }
