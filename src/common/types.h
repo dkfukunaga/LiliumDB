@@ -10,6 +10,8 @@ using SlotNum = uint16_t;
 using FileOffset = uint64_t;
 using PageOffset = uint16_t;
 
+enum class OpenMode { ReadWrite, ReadOnly };
+
 struct RID {
     PageNum page;
     SlotNum slot;
