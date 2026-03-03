@@ -11,7 +11,6 @@ class Status {
 public:
     enum class Code {
         Ok,
-        NewFile,
         FileErr,
         IOErr,
         Corrupt,
@@ -19,7 +18,6 @@ public:
     };
 
     static Status       ok() noexcept { return Status(Code::Ok); }
-    static Status       newFile() { return Status(Code::NewFile); }
     static Status       fileErr(std::string_view msg) { return Status(Code::FileErr, std::string(msg)); }
     static Status       ioErr(std::string_view msg) { return Status(Code::IOErr, std::string(msg)); }
     static Status       corrupt(std::string_view msg) { return Status(Code::Corrupt, std::string(msg)); }
@@ -28,7 +26,7 @@ public:
     Code                code() const noexcept { return code_; }
     const std::string&  message() const noexcept { return message_; }
 
-    bool                isSuccess() const noexcept { return code_ == Code::Ok || code_ == Code::NewFile; }
+    bool                isSuccess() const noexcept { return code_ == Code::Ok; }
     bool                isError() const noexcept { return !isSuccess(); }
     bool                is(Code c) const noexcept { return code_ == c; }
 private:

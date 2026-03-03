@@ -29,7 +29,7 @@ TEST_F(StdPageIOTest, OpenClose) {
     EXPECT_FALSE(pageIO->isOpen());
 
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Close the file
@@ -39,7 +39,7 @@ TEST_F(StdPageIOTest, OpenClose) {
 
 TEST_F(StdPageIOTest, ReadWritePage) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -66,7 +66,7 @@ TEST_F(StdPageIOTest, ReadWritePage) {
 
 TEST_F(StdPageIOTest, WriteReadOnly) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -99,7 +99,7 @@ TEST_F(StdPageIOTest, OpenNonExistentReadOnly) {
 
 TEST_F(StdPageIOTest, OffsetCorrectness) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare two pages of data to write
@@ -134,7 +134,7 @@ TEST_F(StdPageIOTest, OffsetCorrectness) {
 
 TEST_F(StdPageIOTest, OutOfBounds) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a buffer to read into
@@ -151,7 +151,7 @@ TEST_F(StdPageIOTest, OutOfBounds) {
 
 TEST_F(StdPageIOTest, FileSizeVerification) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -187,7 +187,7 @@ TEST_F(StdPageIOTest, ReadWithoutOpen) {
 
 TEST_F(StdPageIOTest, OpenAlreadyOpen) {
     // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::NewFile);
+    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
     EXPECT_TRUE(pageIO->isOpen());
 
     // Attempt to open the file again

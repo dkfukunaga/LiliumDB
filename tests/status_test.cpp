@@ -11,12 +11,6 @@ TEST(StatusTest, Basic) {
     EXPECT_TRUE(s1.is(Status::Code::Ok));
     EXPECT_EQ(s1.message(), "");
 
-    auto s2 = Status::newFile();
-    EXPECT_TRUE(s2.isSuccess());
-    EXPECT_FALSE(s2.isError());
-    EXPECT_TRUE(s2.is(Status::Code::NewFile));
-    EXPECT_EQ(s2.message(), "");
-
     auto s3 = Status::fileErr("file not found");
     EXPECT_FALSE(s3.isSuccess());
     EXPECT_TRUE(s3.isError());
