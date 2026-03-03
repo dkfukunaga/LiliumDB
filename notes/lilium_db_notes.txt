@@ -113,7 +113,7 @@ std::vector<uint8_t> pool_; // poolSize * PAGE_SIZE bytes
 
 struct Frame {
     ByteSpan    data;       // points into pool_ at frame offset
-    PageNum     pageNum;    // which page is loaded, invalid if empty
+    PageNum     pageNum;    // which page is loaded, INVALID_PAGE if empty
     uint32_t    pinCount;
     bool        dirty;
 };
@@ -122,6 +122,51 @@ std::vector<Frame> frames_;
 // map PageNum to frame index
 std::unordered_map<PageNum, size_t> pageTable_;
 
+// map frame index to list position
+std::unordered_map<size_t, std::list<size_t>::iterator> lruMap_;
+
+// linked list of frame indices to keep track of most recently used page
+// any time a page is accessed, it is moved to the front of the list using
+// the iterator from lruMap_
+std::list<size_t> lruList_;    // frame indices, ordered by recency
+
+on fetchPage(PageNum):
+pageNum → pageTable_ → frameIdx → lruMap_ → list iterator → reposition to front
+→ increment pinCount and return Result<PageGuard> built from existing frame
+→ if not found, load new page from PageIO
+→ increment pinCount and return Result<PageGuard> built from new frame
+
+size_t frameIdx = pageTable_[5];           // find which frame holds page 5
+auto it = lruMap_[frameIdx];               // find where that frame is in the list
+lruList_.erase(it);                        // remove from current position - O(1) with iterator
+lruList_.push_front(frameIdx);             // move to front - O(1)
+lruMap_[frameIdx] = lruList_.begin();      // update iterator in map - O(1)
+
+// queue of empty frames that must be fully consumed before evicting
+std::queue<FrameIdx> freeList_
+
+oh loading a new page:
+if freeList_ empty → goto eviction
+else freeList_.pop() → free frame index
+→ load new page into frame
+→ update pageTable_ with new pageNum
+→ push frameIdx to front of lruList_
+→ update lruMap_ with new iterator
+
+// on page eviction:
+scan lruList_ from back → find first frame where pinCount == 0
+→ if none found → return Status::BufferFull
+→ write back if dirty
+→ remove from pageTable_ (old pageNum)
+→ remove from lruMap_
+→ load new page into frame
+→ update pageTable_ with new pageNum
+→ push frameIdx to front of lruList_
+→ update lruMap_ with new iterator
+
+unpinPage
+→ assert on pinCount > 0
+→ if dirty, flush page
 
 
 PageGuard
