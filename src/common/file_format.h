@@ -17,13 +17,9 @@ inline constexpr uint16_t PAGE_SIZE = 4096;
 
 // header sizes
 inline constexpr uint16_t FILE_HEADER_SIZE = 64;
-inline constexpr uint16_t PAGE_HEADER_SIZE = 8;
-inline constexpr uint16_t BRANCH_HEADER_SIZE = 4;
-inline constexpr uint16_t LEAF_HEADER_SIZE = 8;
+inline constexpr uint16_t PAGE_HEADER_SIZE = 16;
 inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
 inline constexpr uint16_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
-inline constexpr uint16_t BRANCH_OVERHEAD = PAGE_OVERHEAD + BRANCH_HEADER_SIZE;
-inline constexpr uint16_t LEAF_OVERHEAD = PAGE_OVERHEAD + LEAF_HEADER_SIZE;
 
 // page 0 offset to usable data region
 inline constexpr PageOffset PAGE_ZERO_OFFSET = FILE_HEADER_SIZE;
@@ -41,14 +37,14 @@ enum class PageType : uint8_t {
 };
 
 struct FileHeader {
-    uint8_t     magic_bytes[8];
-    uint16_t    file_flags;
-    uint8_t     version_major;
-    uint8_t     version_minor;
-    uint32_t    page_count;
-    uint64_t    file_created;
-    uint64_t    last_modified;
-    PageNum     freespace_head;
+    uint8_t     magicBytes[8];
+    uint16_t    fileFlags;
+    uint8_t     versionMajor;
+    uint8_t     versionMinor;
+    uint32_t    pageCount;
+    uint64_t    fileCreated;
+    uint64_t    lastModified;
+    PageNum     freespaceHead;
     uint32_t    checksum;
     uint8_t     reserved[24];   // pad to 64 bytes
 };
@@ -56,28 +52,17 @@ struct FileHeader {
 static_assert(sizeof(FileHeader) == FILE_HEADER_SIZE);
 
 struct PageHeader {
-    PageType    page_type;
-    uint8_t     page_flags;
-    uint8_t     level;          // used by BPTree, 0 = leaf
+    PageType    type;
+    uint8_t     flags;
+    uint16_t    numSlots;
+    uint16_t    freeOffset;
+    uint8_t     level;
     uint8_t     reserved;
-    uint16_t    slot_count;
-    PageOffset  free_offset;
+    PageNum     next;
+    PageNum     prev;
 };
 
 static_assert(sizeof(PageHeader) == PAGE_HEADER_SIZE);
-
-struct BranchHeader {
-    PageNum     right_child;
-};
-
-static_assert(sizeof(BranchHeader) == BRANCH_HEADER_SIZE);
-
-struct LeafHeader {
-    PageNum     next_page;
-    PageNum     prev_page;
-};
-
-static_assert(sizeof(LeafHeader) == LEAF_HEADER_SIZE);
 
 struct PageFooter {
     uint32_t    checksum;
