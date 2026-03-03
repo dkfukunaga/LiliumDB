@@ -63,10 +63,10 @@ static_assert(sizeof(FileHeader) == FILE_HEADER_SIZE);
 struct PageHeader {
     PageType    type;
     uint8_t     flags;
+    uint8_t     reserved;
+    uint8_t     level;
     uint16_t    slotCount;
     uint16_t    freeOffset;
-    uint8_t     level;
-    uint8_t     reserved;
     PageNum     next;
     PageNum     prev;
 };
