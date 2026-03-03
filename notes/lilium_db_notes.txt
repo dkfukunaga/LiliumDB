@@ -168,6 +168,67 @@ unpinPage
 → assert on pinCount > 0
 → if dirty, flush page
 
+deletePage(PageNum):
+→ verify pageNum not out of range
+→ check pageTable_ for frameIdx
+→ if found:
+    → assert pinCount == 0  // can't delete a pinned page
+    → zero out ByteSpan
+    → flush zeroed page to PageIO
+    → remove from pageTable_
+    → remove from lruMap_
+    → remove from lruList_
+    → reset frame
+        → pageNum = INVALID_PAGE
+        → dirty = false
+        → pinCount = 0
+    → push frameIdx back onto freeList_
+→ else:
+    → create zeroed buffer of PAGE_SIZE bytes
+    → write zero buffer directly via PageIO
+→ update free page tracking (wherever that lives)
+
+
+flushPage(PageNum):
+→ if pageNum >= flushedCount_:
+    → must flush all pages from flushedCount_ to pageNum in order first
+    → for p = flushedCount_ to pageNum:
+        → find frame for p (must be in pool since it's new and unflushed)
+        → write to PageIO
+        → flushedCount_++
+→ else:
+    → normal flush, page already exists on disk
+
+
+newPage(PageType type):
+→ check free page tracking for a recycled pageNum
+    → if found: use that pageNum
+→ else:
+    → pageNum = pageCount_
+    → pageCount_++
+→ get a frame (freeList_ or eviction)
+→ initialize frame:
+    → zero out ByteSpan first (clean slate)
+    → write PageHeader at offset 0:
+        → type = type parameter
+        → flags = 0
+        → slotCount = 0
+        → freeOffset = sizeof(PageHeader)
+        → level = 0
+        → next = INVALID_PAGE
+        → prev = INVALID_PAGE
+    → write PageFooter at offset PAGE_SIZE - PAGE_FOOTER_SIZE
+        (will implement checksums later, for now just dummy data)
+→ set frame.pageNum = pageNum
+→ set frame.pinCount = 1
+→ set frame.dirty = true    // new page needs to be flushed
+→ add to pageTable_
+→ push to front of lruList_
+→ update lruMap_
+→ update free page tracking
+→ return Result<PageGuard>
+
+
 
 PageGuard
     - consider splitting into ReadPageGuard and WritePageGuard to handle marking
