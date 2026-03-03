@@ -19,10 +19,19 @@ inline constexpr uint16_t PAGE_SIZE = 4096;
 inline constexpr uint16_t FILE_HEADER_SIZE = 64;
 inline constexpr uint16_t PAGE_HEADER_SIZE = 16;
 inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
-inline constexpr uint16_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
 
-// page 0 offset to usable data region
-inline constexpr PageOffset PAGE_ZERO_OFFSET = FILE_HEADER_SIZE;
+// page offsets and usable size
+inline constexpr uint16_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
+inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_OVERHEAD;
+inline constexpr uint16_t PAGE_DATA_START = PAGE_HEADER_SIZE;
+inline constexpr uint16_t PAGE_DATA_END   = PAGE_SIZE - PAGE_FOOTER_SIZE;
+
+// page 0 offsets and usable size
+inline constexpr PageOffset PAGE_ZERO_OVERHEAD = FILE_HEADER_SIZE + PAGE_OVERHEAD;
+inline constexpr PageOffset PAGE_ZERO_USABLE_SIZE = PAGE_SIZE - PAGE_ZERO_OVERHEAD;
+inline constexpr PageOffset PAGE_ZERO_HEADER_OFFSET = FILE_HEADER_SIZE;
+inline constexpr PageOffset PAGE_ZERO_DATA_START = FILE_HEADER_SIZE + PAGE_HEADER_SIZE;
+inline constexpr PageOffset PAGE_ZERO_DATA_END = PAGE_SIZE - PAGE_FOOTER_SIZE;
 
 // sentinel values for invalid offsets
 inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
@@ -42,11 +51,11 @@ struct FileHeader {
     uint8_t     versionMajor;
     uint8_t     versionMinor;
     uint32_t    pageCount;
-    uint64_t    fileCreated;
-    uint64_t    lastModified;
+    int64_t     fileCreated;    // seconds since unix epoch
+    int64_t     lastModified;   // seconds since unix epoch
     PageNum     freespaceHead;
-    uint32_t    checksum;
     uint8_t     reserved[24];   // pad to 64 bytes
+    uint32_t    checksum;       // always last; will implement later
 };
 
 static_assert(sizeof(FileHeader) == FILE_HEADER_SIZE);
@@ -65,7 +74,7 @@ struct PageHeader {
 static_assert(sizeof(PageHeader) == PAGE_HEADER_SIZE);
 
 struct PageFooter {
-    uint32_t    checksum;
+    uint32_t    checksum;       // reserved; will implement later
 };
 
 static_assert(sizeof(PageFooter) == PAGE_FOOTER_SIZE);
