@@ -33,10 +33,17 @@ Status StdPageIO::open(std::string_view path, OpenMode mode) {
         return Status::ok();
     }
 
-    // file doesn't exist, create it
-    file_.open(path.data(), std::ios::binary | std::ios::out);
-    file_.close();
-    file_.open(path.data(), om);
+    // if file doesn't exist and trying to open in read-only mode,
+    // return FileErr instead of NewFile, since we won't be able to read from it
+    if (mode == OpenMode::ReadOnly) {
+        return Status::fileErr("File does not exist.");
+    } else {
+        // if file doesn't exist and trying to open in read-write mode,
+        // create the file and then open it
+        file_.open(path.data(), std::ios::binary | std::ios::out);
+        file_.close();
+        file_.open(path.data(), om);
+    }    
 
     if (file_.is_open()) {
         return Status::newFile();
