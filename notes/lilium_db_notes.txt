@@ -7,6 +7,26 @@ pager/      — manages pages in memory and on disk
 storage/    — raw file I/O
 common/     — shared utilities
 
+Database is responsible for:
+    Constructing and owning all components
+    Calling Pager::open() then Catalog::open() in the right order
+    Calling Catalog::close() then Pager::close() on shutdown
+    Exposing a clean interface to QueryProcessor
+
+
+     QueryProcessor
+           │
+        Database
+           │
+        Catalog
+      ┌────┴────┐
+RecordStore  BTreeIndex
+      └────┬────┘
+        BPTree
+           │
+         Pager
+           │
+         PageIO
 
 
 ┌─────────────────────────────────────────────────┐
@@ -106,8 +126,8 @@ fetchPage(PageNum)      — get a page, pinning it in the buffer pool
 unpinPage(PageNum)      — release the pin after you're done
 newPage()               — allocate a new page, returns pinned page
 deletePage(PageNum)     — mark a page for deletion
-flushPage(PageNum)      — force a specific dirty page to disk
-flushAll()              — flush all dirty pages
+// flushPage(PageNum)      — force a specific dirty page to disk
+// flushAll()              — flush all dirty pages
 
 std::vector<uint8_t> pool_; // poolSize * PAGE_SIZE bytes
 
@@ -229,6 +249,15 @@ newPage(PageType type):
 → return Result<PageGuard>
 
 
+Pager::open() on new file:
+    → StdPageIO creates empty file
+    → Pager calls newPage() for page 0
+    → page 0 initialized with PageType::Header
+    → Pager writes FileHeader at offset 0 of page 0
+    → remainder of page 0 is zeroed = PageType::Invalid by definition
+    → page 0 marked dirty, will flush on eviction or close
+
+
 
 PageGuard
     - consider splitting into ReadPageGuard and WritePageGuard to handle marking
@@ -245,6 +274,40 @@ Pager
 
 
 
+
+
+Catalog
+
+Catalog::open():
+    → read page 0 via Pager
+    → check PageType at PAGE_ZERO_DATA_START
+    → if PageType::Invalid:
+        → system tables don't exist, initialize them
+        → write sys_tables root into page 0 data region
+    → else:
+        → load existing system tables
+
+
+
+
+
+Database::open(path):
+    → Pager::open(path)
+        → PageIO::open(path)
+        → if new file: ready to initialize page 0 on first write
+        → if existing file: verify magic bytes and version
+    → Catalog is ready but hasn't touched anything yet
+
+first write operation:
+    → Catalog::createTable() or similar
+        → BPTree::allocate page for sys_tables root
+            → Pager::newPage()
+                → if page 0 not yet initialized:
+                    → write FileHeader to page 0
+                    → page 0 now valid
+                → allocate requested page
+        → Catalog writes sys_tables and sys_columns bootstrap data
+        → system tables now exist, normal operations proceed
 
 
 
