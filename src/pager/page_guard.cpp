@@ -13,6 +13,7 @@ PageGuard::PageGuard(Pager* pager, PageNum pageNum, ByteSpan data)
     pager_->pinPage(pageNum);
 }
 
+// Transfers existing pin; does not call pinPage.
 PageGuard::PageGuard(PageGuard&& other) noexcept
     : pager_(other.pager_)
     , pageNum_(other.pageNum_)
