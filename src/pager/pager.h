@@ -30,9 +30,9 @@ public:
         PageGuard& operator=(PageGuard&& other) noexcept {
             if (this != &other) {
                 if (pager_) pager_->unpinPage(pageNum_, dirty_);  // release current page
-                pager_    = other.pager_;
-                pageNum_  = other.pageNum_;
-                data_     = other.data_;
+                pager_       = other.pager_;
+                pageNum_     = other.pageNum_;
+                data_        = other.data_;
                 other.pager_ = nullptr;
             }
             return *this;
@@ -52,11 +52,11 @@ public:
     };
 
     virtual Status              open(std::string_view path, OpenMode mode = OpenMode::ReadWrite) = 0;
-    virtual Status              close() = 0;
+    virtual Status              close() = 0;    // write lastModified to PageHeader before closing
     virtual Result<PageGuard>   fetchPage(PageNum pageNum) = 0;
-    virtual Result<PageNum>     allocatePage() = 0;
+    virtual Result<PageGuard>   newPage() = 0;
+    virtual Status              deletePage(PageNum pageNum) = 0;
     virtual bool                isOpen() const = 0;
-    virtual bool                isNewFile() const = 0;
 
     virtual ~Pager() = default;
 protected:
