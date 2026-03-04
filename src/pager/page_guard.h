@@ -22,7 +22,6 @@ public:
     ByteView    view() const;
     PageNum     pageNum() const { return pageNum_; }
 
-    // no copy assignment; move only
     PageGuard&  operator=(const PageGuard&) = delete;
     PageGuard&  operator=(PageGuard&& other) noexcept;
 private:

@@ -31,7 +31,7 @@ PageGuard::~PageGuard() {
 
 ByteSpan PageGuard::span() {
     if (pager_) { 
-        pager_->markDirty(pageNum());
+        pager_->markDirty(pageNum_);
     }
     return data_;
 }
