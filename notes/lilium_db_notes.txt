@@ -152,9 +152,8 @@ std::list<size_t> lruList_;    // frame indices, ordered by recency
 
 on fetchPage(PageNum):
 pageNum → pageTable_ → frameIdx → lruMap_ → list iterator → reposition to front
-→ increment pinCount and return Result<PageGuard> built from existing frame
-→ if not found, load new page from PageIO
-→ increment pinCount and return Result<PageGuard> built from new frame
+→ if found, return Result<PageGuard> built from existing frame (PageGuard pins page automatically)
+→ if not found, load new page from PageIO and return Result<PageGuard> built from new frame
 
 size_t frameIdx = pageTable_[5];           // find which frame holds page 5
 auto it = lruMap_[frameIdx];               // find where that frame is in the list
@@ -201,7 +200,6 @@ deletePage(PageNum):
     → reset frame
         → pageNum = INVALID_PAGE
         → dirty = false
-        → pinCount = 0
     → push frameIdx back onto freeList_
 → else:
     → create zeroed buffer of PAGE_SIZE bytes
@@ -240,7 +238,6 @@ newPage(PageType type):
     → write PageFooter at offset PAGE_SIZE - PAGE_FOOTER_SIZE
         (will implement checksums later, for now just dummy data)
 → set frame.pageNum = pageNum
-→ set frame.pinCount = 1
 → set frame.dirty = true    // new page needs to be flushed
 → add to pageTable_
 → push to front of lruList_
@@ -259,12 +256,6 @@ Pager::open() on new file:
 
 
 
-PageGuard
-    - consider splitting into ReadPageGuard and WritePageGuard to handle marking
-        dirty rather than relying on manually calling markDirty()
-    - Pager gets fetchPageRead and fetchPageWrite
-    - Pager maybe gets an upgrade method to replace a ReadPageGuard with a 
-        WritePageGuard
 
 Pager
     - have pool size be a constructor parameter
