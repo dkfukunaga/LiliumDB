@@ -14,11 +14,10 @@ class ByteView;
 
 class ByteSpan {
 public:
-    ByteSpan(uint8_t* bytes, size_t size):
-        data_(bytes),
-        size_(size) {
-            assert(data_ != nullptr || size_ == 0);
-        }
+    ByteSpan(): data_(nullptr), size_(0) { }
+    ByteSpan(uint8_t* bytes, size_t size): data_(bytes), size_(size) {
+        assert(data_ != nullptr || size_ == 0);
+    }
 
     uint8_t&                        at(size_t offset);
     [[nodiscard]] ByteSpan          subspan(size_t start, size_t len);
@@ -60,14 +59,11 @@ private:
 
 class ByteView {
 public:
-    ByteView(const uint8_t* bytes, size_t size):
-        data_(bytes),
-        size_(size) {
-            assert(data_ != nullptr || size_ == 0);
-        }
-    ByteView(const ByteSpan& span):
-        data_(span.data()),
-        size_(span.size()) { }
+    ByteView(): data_(nullptr), size_(0) { }
+    ByteView(const uint8_t* bytes, size_t size): data_(bytes), size_(size) {
+        assert(data_ != nullptr || size_ == 0);
+    }
+    ByteView(const ByteSpan& span): data_(span.data()), size_(span.size()) { }
 
     uint8_t                         at(size_t offset) const;
     [[nodiscard]] ByteView          subview(size_t start, size_t len) const;
