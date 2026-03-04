@@ -7,6 +7,8 @@
 
 namespace LiliumDB {
 
+enum class OpenMode { ReadWrite, ReadOnly };
+
 class PageIO {
 public:
     virtual ~PageIO() = default;

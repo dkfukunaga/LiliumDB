@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <array>
-#include <limits>
 
 #include "types.h"
 
@@ -32,18 +31,6 @@ inline constexpr PageOffset PAGE_ZERO_USABLE_SIZE = PAGE_SIZE - PAGE_ZERO_OVERHE
 inline constexpr PageOffset PAGE_ZERO_HEADER_OFFSET = FILE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_START = FILE_HEADER_SIZE + PAGE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_END = PAGE_SIZE - PAGE_FOOTER_SIZE;
-
-// sentinel values for invalid offsets
-inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
-inline constexpr SlotNum INVALID_SLOT = std::numeric_limits<SlotNum>::max();
-
-enum class PageType : uint8_t {
-    Invalid     = 0,    // invalid/unitialized
-    Table       = 1,    // table page
-    Index       = 2,    // index page
-    Expansion   = 3,    // overflow (future)
-    FreeSpace   = 4,    // Freespace map (future)
-};
 
 struct FileHeader {
     uint8_t     magicBytes[8];
