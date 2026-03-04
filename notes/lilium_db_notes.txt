@@ -335,20 +335,80 @@ DBError     — error return code enum
 
 SYS_TABLES
 ==========
-TABLE_ID
-TABLE_NAME
-TABLE_TYPE
-TABLE_ROOT
+TABLE_ID        INT (PK)
+TABLE_NAME      VARCHAR
+TABLE_TYPE      VARCHAR     // "system", "user"
+TABLE_ROOT      INT
 
 SYS_COLUMNS
 ===========
-COLUMN_ID
-COLUMN_NAME
-TABLE_ID
-COLUMN_INDEX
-DATATYPE
-IS_NULLABLE
-COLUMN_DEFAULT
+TABLE_ID        INT (PK, FK -> SYS_TABLES.TABLE_ID)
+COLUMN_INDEX    INT (PK)
+COLUMN_NAME     VARCHAR
+TYPE_ID         INT (FK -> SYS_TYPES.TYPE_ID)
+IS_NULLABLE     BOOL
+MAX_LENGTH      INT         // for VARCHAR, -1 if unlimited or not applicable
+DEFAULT_VAL     VARCHAR
+
+SYS_TYPES
+=========
+TYPE_ID         INT
+TYPE_NAME       VARCHAR
+TYPE_LENGTH     SMALLINT    // -1 for variable length
+TYPE_CATEGORY   SMALLINT    // maps to an internal enum: INTEGER, FLOAT, STRING, BOOLEAN, DATETIME, ENUM, ARRAY
+
+SYS_ENUM_DEFS
+=============
+TYPE_ID         INT (PK, FK -> SYS_TYPES.TYPE_ID)
+VALUE_ID        INT (PK)
+VALUE_NAME      VARCHAR
+
+SYS_SEQUENCES
+=============
+TABLE_ID    INT (PK, FK -> SYS_TABLES.TABLE_ID)
+NEXT_ID     INT
+
+
+enum class BuiltInType : uint16_t {
+    Int8     = 1,
+    Int16    = 2,
+    Int32    = 3,
+    Int64    = 4,
+    Float32  = 5,
+    Float64  = 6,
+    Decimal  = 7,   // not yet implemented
+    Boolean  = 8,
+    Varchar  = 9,
+    Date     = 10,  // not yet implemented
+    Time     = 11,  // not yet implemented
+    DateTime = 12,  // not yet implemented
+};
+
+static constexpr uint16_t USER_TYPE_START  = 1000;
+static constexpr uint16_t USER_TABLE_START = 100;
+
+enum class BuiltInTable : uint32_t {
+    SysTables    = 1,
+    SysTypes     = 2,
+    SysEnumDefs  = 3,
+    SysSequences = 4,
+    SysColumns   = 5,
+}
+
+static constexpr PageNum USER_TABLE_ID_START = 100;
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
