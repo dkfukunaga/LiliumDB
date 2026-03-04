@@ -13,6 +13,7 @@ class PageGuard;
 // A successfully constructed Pager is ready to use.
 class Pager {
 public:
+    // Implementations should close the file in their destructor if still open.
     virtual ~Pager() = default;
 
     virtual Status              close() = 0;
