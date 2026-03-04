@@ -8,6 +8,7 @@ namespace LiliumDB {
 
 class Pager;
 
+// Pins page on creation and unpins on destruction
 class PageGuard {
 public:
     PageGuard(Pager* pager, PageNum pageNum, ByteSpan data);
@@ -16,14 +17,14 @@ public:
     ~PageGuard();
 
     // automatically mark dirty on return of a mutable span
-    ByteSpan        span();
+    ByteSpan    span();
     // do not mark dirty on return of immutable view
-    ByteView        view() const;
-    PageNum         pageNum() const { return pageNum_; }
+    ByteView    view() const;
+    PageNum     pageNum() const { return pageNum_; }
 
     // no copy assignment; move only
-    PageGuard& operator=(const PageGuard&) = delete;
-    PageGuard& operator=(PageGuard&& other) noexcept;
+    PageGuard&  operator=(const PageGuard&) = delete;
+    PageGuard&  operator=(PageGuard&& other) noexcept;
 private:
     Pager*      pager_;
     PageNum     pageNum_;
