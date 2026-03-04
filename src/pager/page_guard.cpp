@@ -19,9 +19,9 @@ PageGuard::PageGuard(PageGuard&& other) noexcept
     , pageNum_(other.pageNum_)
     , data_(other.data_) {
     // invalidate other PageGuard
-    other.pager_ = nullptr;
+    other.pager_    = nullptr;
     other.pageNum_  = INVALID_PAGE;
-    other.data_     = ByteSpan(nullptr, 0);
+    other.data_     = ByteSpan();
 }
 
 PageGuard::~PageGuard() {
@@ -56,7 +56,7 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
         // invalidate other PageGuard
         other.pager_    = nullptr;
         other.pageNum_  = INVALID_PAGE;
-        other.data_     = ByteSpan(nullptr, 0);
+        other.data_     = ByteSpan();
     }
     return *this;
 }
