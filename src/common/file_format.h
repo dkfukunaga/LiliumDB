@@ -38,11 +38,11 @@ inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
 inline constexpr SlotNum INVALID_SLOT = std::numeric_limits<SlotNum>::max();
 
 enum class PageType : uint8_t {
-    Invalid = 0,    // invalid/unitialized
-    Table,          // Table B+ Tree
-    Index,          // Index B+ Tree
-    Expansion,      // overflow (future)
-    FreeSpace,      // Freespace map (future)
+    Invalid     = 0,    // invalid/unitialized
+    Table       = 1,    // table page
+    Index       = 2,    // index page
+    Expansion   = 3,    // overflow (future)
+    FreeSpace   = 4,    // Freespace map (future)
 };
 
 struct FileHeader {
@@ -64,10 +64,10 @@ struct PageHeader {
     PageType    type;
     uint8_t     flags;
     uint8_t     reserved;
-    uint8_t     level;
-    uint16_t    slotCount;
-    uint16_t    freeOffset;
-    PageNum     next;
+    uint8_t     level;          // for B+ tree - 0 indicates leaf page
+    uint16_t    slotCount;      // used by RecordStore
+    uint16_t    freeOffset;     // used by RecordStore
+    PageNum     next;           // right child for B+ tree branch pages
     PageNum     prev;
 };
 
