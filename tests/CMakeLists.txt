@@ -19,3 +19,7 @@ gtest_discover_tests(status_test)
 add_executable(std_page_io_test std_page_io_test.cpp)
 target_link_libraries(std_page_io_test PRIVATE liliumdb_lib GTest::gtest_main)
 gtest_discover_tests(std_page_io_test)
+
+add_executable(result_test result_test.cpp)
+target_link_libraries(result_test PRIVATE liliumdb_lib GTest::gtest_main)
+gtest_discover_tests(result_test)
