@@ -33,11 +33,11 @@ Database is responsible for:
       ┌────┴────┐
 RecordStore  BTreeIndex
       └────┬────┘
-        BPTree
+         BTree
            │
          Pager
            │
-         PageIO
+        PageIO
 
 
 ┌─────────────────────────────────────────────────┐
@@ -63,7 +63,7 @@ RecordStore  BTreeIndex
              └────────────┬───────────┘
                           │
 ┌─────────────────────────▼───────────────────────┐
-│                    BPTree                       │
+│                     BTree                       │
 │         splitting, merging, traversal,          │
 │         key comparison, page navigation         │
 └─────────────────────────┬───────────────────────┘
@@ -306,7 +306,7 @@ Database::open(path):
 
 first write operation:
     → Catalog::createTable() or similar
-        → BPTree::allocate page for sys_tables root
+        → BTree::allocate page for sys_tables root
             → Pager::newPage()
                 → if page 0 not yet initialized:
                     → write FileHeader to page 0
