@@ -35,7 +35,9 @@ private:
     Pager*      pager_;
     PageNum     pageNum_;
     ByteSpan    data_;
-    bool        dirty_ = false;
+    bool        dirty_;
+
+    void        invalidate() noexcept;
 };
 
 } // namespace LiliumDB

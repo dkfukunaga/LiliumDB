@@ -3,30 +3,30 @@
 #include "pager.h"
 #include "common/types.h"
 
+#include <cassert>
 
 namespace LiliumDB {
 
 PageGuard::PageGuard(Pager* pager, PageNum pageNum, ByteSpan data)
     : pager_(pager)
     , pageNum_(pageNum)
-    , data_(data) {
+    , data_(data)
+    , dirty_(false) {
     pager_->pinPage(pageNum);
 }
 
-// Transfers existing pin; does not call pinPage.
 PageGuard::PageGuard(PageGuard&& other) noexcept
     : pager_(other.pager_)
     , pageNum_(other.pageNum_)
-    , data_(other.data_) {
+    , data_(other.data_)
+    , dirty_(other.dirty_) {
     // invalidate other PageGuard
-    other.pager_    = nullptr;
-    other.pageNum_  = INVALID_PAGE;
-    other.data_     = ByteSpan();
+    other.invalidate();
 }
 
 PageGuard::~PageGuard() {
     if (pager_) {
-        pager_->unpinPage(pageNum());
+        pager_->unpinPage(pageNum_);
     }
 }
 
@@ -55,13 +55,19 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
         pager_      = other.pager_;
         pageNum_    = other.pageNum_;
         data_       = other.data_;
+        dirty_      = other.dirty_;
 
         // invalidate other PageGuard
-        other.pager_    = nullptr;
-        other.pageNum_  = INVALID_PAGE;
-        other.data_     = ByteSpan();
+        other.invalidate();
     }
     return *this;
+}
+
+void PageGuard::invalidate() noexcept {
+    pager_ = nullptr;
+    pageNum_ = INVALID_PAGE;
+    data_ = ByteSpan();
+    dirty_ = false;
 }
 
 } // namespace LiliumDB
