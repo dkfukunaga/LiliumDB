@@ -2,6 +2,7 @@
 #define LILIUMDB_PAGER_H
 
 #include "common/types.h"
+#include "common/file_format.h"
 #include "common/status.h"
 #include "common/result.h"
 
