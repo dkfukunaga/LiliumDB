@@ -1,3 +1,14 @@
+TODO:
+    - refactor StdPageIO to use the same factory pattern as LRUPager:
+        class StdPageIO : public PageIO {
+        public:
+            static Result<std::unique_ptr<StdPageIO>> open(std::string_view path, OpenMode mode);
+        private:
+            StdPageIO(/* internal args */);
+        };
+    - 
+
+
 
 
 query/      — processes queries
