@@ -9,13 +9,15 @@ namespace LiliumDB {
 using PageNum = uint32_t;
 using SlotNum = uint16_t;
 using PageOffset = uint16_t;
+using RecordSize = uint16_t;
 
 enum class PageType : uint8_t {
     Invalid     = 0,    // invalid/unitialized
     Table       = 1,    // table page
     Index       = 2,    // index page
     Expansion   = 3,    // overflow (future)
-    FreeSpace   = 4,    // Freespace map (future)
+    FreeList    = 4,    // free list
+    FreeSpace   = 5,    // Freespace map (future)
 };
 
 // sentinel values for invalid offsets
