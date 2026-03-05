@@ -4,11 +4,12 @@
 #include "pager.h"
 
 #include "common/types.h"
-#include "common/status.h"
-#include "common/byte_span.h"
-#include "common/result.h"
 #include "common/file_format.h"
+#include "common/status.h"
+#include "common/result.h"
+#include "common/byte_span.h"
 #include "storage/page_io.h"
+#include "pager/page_guard.h"
 
 #include <memory>
 #include <vector>
@@ -48,6 +49,11 @@ private:
     };
 
     std::unique_ptr<PageIO> pageIO_;
+
+    uint32_t pageCount;
+    PageNum freespaceHead;
+    PageNum appendStart;
+
     size_t nextFreeFrame_ = 0;
     // buffer pool of poolSize * PAGE_SIZE bytes
     std::vector<uint8_t> pool_;
