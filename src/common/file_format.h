@@ -5,11 +5,19 @@
 #include <array>
 
 #include "types.h"
+#include "flags.h"
 
 namespace LiliumDB {
 
 //  magic bytes: CAT_CAFE LDB\0
 inline constexpr std::array<uint8_t, 8> MAGIC = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
+
+// current version is 0.0
+inline constexpr uint8_t VERSION_MAJOR = 0;
+inline constexpr uint8_t VERSION_MINOR = 0;
+
+// checksum placeholder value
+inline constexpr uint32_t CHECKSUM_PLACEHOLDER = 0xDEADBEEF;
 
 // page size
 inline constexpr uint16_t PAGE_SIZE = 4096;
@@ -32,9 +40,26 @@ inline constexpr PageOffset PAGE_ZERO_HEADER_OFFSET = FILE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_START = FILE_HEADER_SIZE + PAGE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_END = PAGE_SIZE - PAGE_FOOTER_SIZE;
 
+enum class PageType : uint8_t {
+    Invalid     = 0,    // invalid/unitialized
+    Table       = 1,    // table page
+    Index       = 2,    // index page
+    Expansion   = 3,    // overflow (future)
+    FreeList    = 4,    // free list
+    FreeSpace   = 5,    // Freespace map (future)
+};
+
+enum class FileFlag : uint16_t {
+    None     = 0x00,
+    ReadOnly = 0x01,
+    Corrupt  = 0x02,
+};
+
+using FileFlags = Flags<FileFlag>;
+
 struct FileHeader {
     uint8_t     magicBytes[8];
-    uint16_t    fileFlags;
+    FileFlags   fileFlags;
     uint8_t     versionMajor;
     uint8_t     versionMinor;
     uint32_t    pageCount;
@@ -47,11 +72,18 @@ struct FileHeader {
 
 static_assert(sizeof(FileHeader) == FILE_HEADER_SIZE);
 
+enum class PageFlag : uint8_t {
+    None     = 0x00,
+    Corrupt  = 0x01,
+};
+
+using PageFlags = Flags<PageFlag>;
+
 struct PageHeader {
     PageType    type;
-    uint8_t     flags;
-    uint8_t     reserved;
+    PageFlags   pageFlags;
     uint8_t     level;          // for B+ tree - 0 indicates leaf page
+    uint8_t     reserved;       // reserved for fragmentCount in RecordStore (future)
     uint16_t    slotCount;      // used by RecordStore
     uint16_t    freeOffset;     // used by RecordStore
     PageNum     next;           // right child for B+ tree branch pages
