@@ -55,11 +55,13 @@ private:
     // PageGuard calls these directly to manage pin state and dirty tracking.
     friend class PageGuard;
 
-    virtual void                markDirty(PageNum pageNum) noexcept = 0;
-    virtual void                pinPage(PageNum pageNum) noexcept = 0;
-    virtual void                unpinPage(PageNum pageNum) noexcept = 0;
+    virtual void markDirty(PageNum pageNum) noexcept = 0;
+    virtual void pinPage(PageNum pageNum) noexcept = 0;
+    virtual void unpinPage(PageNum pageNum) noexcept = 0;
 };
 
 } // namespace LiliumDB
+
+#include "page_guard.h" // PageGuard needs Pager to be defined first
 
 #endif
