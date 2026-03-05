@@ -133,12 +133,16 @@ WindowsPageIO       — concrete (CreateFile/FlushFileBuffers)
 
 Pager
 
-fetchPage(PageNum)      — get a page, pinning it in the buffer pool
-unpinPage(PageNum)      — release the pin after you're done
-newPage()               — allocate a new page, returns pinned page
-deletePage(PageNum)     — mark a page for deletion
-// flushPage(PageNum)      — force a specific dirty page to disk
-// flushAll()              — flush all dirty pages
+public interface:
+    fetchPage(PageNum) : Result<PageGuard>  — get a page, pinning it in the buffer pool
+    newPage(PageType) : Result<PageGuard>   — allocate a new page, returns pinned page
+    deletePage(PageNum) : Status            — mark a page for deletion
+    flushPage(PageNum) : Status             — force a specific dirty page to disk
+    flushAll() : Status                     — flush all dirty pages
+used by friend class PageGuard:
+    pinPage(PageNum)                        — pin the page on creation of PageGuard
+    unpinPage(PageNum)                      — release the pin after you're done
+    markDirty(PageNum)                      — mark page for flushing
 
 std::vector<uint8_t> pool_; // poolSize * PAGE_SIZE bytes
 
