@@ -35,6 +35,7 @@ private:
     Pager*      pager_;
     PageNum     pageNum_;
     ByteSpan    data_;
+    bool        dirty_ = false;
 };
 
 } // namespace LiliumDB

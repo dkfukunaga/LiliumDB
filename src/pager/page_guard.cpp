@@ -31,13 +31,16 @@ PageGuard::~PageGuard() {
 }
 
 ByteSpan PageGuard::span() {
-    if (pager_) { 
+    assert(pager_ && "Cannot access page data from an invalid PageGuard");
+    if (!dirty_) { 
         pager_->markDirty(pageNum_);
+        dirty_ = true;
     }
     return data_;
 }
 
 ByteView PageGuard::view() const {
+    assert(pager_ && "Cannot access page data from an invalid PageGuard");
     return ByteView(data_);
 }
 
