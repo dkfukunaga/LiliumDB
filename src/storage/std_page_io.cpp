@@ -4,48 +4,45 @@
 
 namespace LiliumDB {
 
-StdPageIO::~StdPageIO() { close(); }
+Result<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, OpenMode mode) {
+    StdPageIO* p = new StdPageIO(mode);
+    std::unique_ptr<StdPageIO> stdPageIO(p);
 
-Status StdPageIO::open(std::string_view path, OpenMode mode) {
-    if (isOpen()) {
-        return Status::fileErr("File is already open.");
-    }
-
-    mode_ = mode;
-
-    std::ios::openmode om;
-    switch (mode) {
+    std::ios::openmode om = std::ios::binary;
+    switch (stdPageIO->mode_) {
         case OpenMode::ReadWrite:
-            om = std::ios::binary | std::ios::in | std::ios::out;
+            om |= std::ios::in | std::ios::out;
             break;
         case OpenMode::ReadOnly:
-            om = std::ios::binary | std::ios::in;
+            om |= std::ios::in;
             break;
-        default:
-            return Status::fileErr("Unknown open mode.");
     }
 
-    file_.open(path.data(), om);
+    stdPageIO->file_.open(path.data(), om);
 
-    if (!file_.is_open()) {
+    if (!stdPageIO->file_.is_open()) {
         // if file doesn't exist and trying to open in read-only mode,
         // return FileErr instead of NewFile, since we won't be able to read from it
         if (mode == OpenMode::ReadOnly) {
-            return Status::fileErr("File does not exist.");
+            return Err(Status::fileErr("File does not exist."));
         } else { // create the file and then open it
-            file_.open(path.data(), std::ios::binary | std::ios::out);
-            file_.close();
-            file_.open(path.data(), om);
+            stdPageIO->file_.open(path.data(), std::ios::binary | std::ios::out | std::ios::app);
+            stdPageIO->file_.close();
+            stdPageIO->file_.open(path.data(), om);
         }
     }
 
-    if (file_.is_open()) {
-        file_.seekg(0, std::ios::end);
-        pageCount_ = static_cast<PageNum>(file_.tellg() / PAGE_SIZE);
-        return Status::ok();
+    if (stdPageIO->file_.is_open()) {
+        stdPageIO->file_.seekg(0, std::ios::end);
+        auto fileSize = stdPageIO->file_.tellg();
+        if (fileSize % PAGE_SIZE != 0) {
+            return Err(Status::fileErr("Incorrect file size."));
+        }
+        stdPageIO->pageCount_ = static_cast<PageNum>(fileSize / PAGE_SIZE);
+        return Ok(std::move(stdPageIO));
     }
 
-    return Status::fileErr("Failed to open file.");
+    return Err(Status::fileErr("Failed to open file."));
 }
 
 Status StdPageIO::close() {
