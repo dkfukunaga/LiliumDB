@@ -23,6 +23,7 @@ public:
     Status              writePage(PageNum page, ByteView src) override;
 
     bool                isOpen() const override;
+    uint32_t            pageCount() const override { return pageCount_; }
 
 private:
     StdPageIO(OpenMode mode): mode_(mode), pageCount_(0) { }
