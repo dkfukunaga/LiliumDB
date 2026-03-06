@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <filesystem>
+#include <fstream>
 
 #include <gtest/gtest.h>
 
@@ -16,9 +17,9 @@ protected:
     std::string path = "test_page_io.dat";
     std::unique_ptr<PageIO> pageIO = nullptr;
 
-    void SetUp() override {
-        pageIO = std::make_unique<StdPageIO>();
-    }
+    // void SetUp() override {
+    //     pageIO = std::make_unique<StdPageIO>();
+    // }
 
     void TearDown() override {
         std::filesystem::remove(path);
@@ -26,10 +27,10 @@ protected:
 };
 
 TEST_F(StdPageIOTest, OpenClose) {
-    EXPECT_FALSE(pageIO->isOpen());
-
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Close the file
@@ -38,8 +39,10 @@ TEST_F(StdPageIOTest, OpenClose) {
 }
 
 TEST_F(StdPageIOTest, ReadWritePage) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -65,8 +68,10 @@ TEST_F(StdPageIOTest, ReadWritePage) {
 }
 
 TEST_F(StdPageIOTest, WriteReadOnly) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -80,8 +85,10 @@ TEST_F(StdPageIOTest, WriteReadOnly) {
     // Close the file
     EXPECT_EQ(pageIO->close().code(), Code::Ok);
 
-    // Reopen the file in read-only mode
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadOnly).code(), Code::Ok);
+    // Construct a new PageIO reoping the file in read-only mode
+    r = StdPageIO::open(path, OpenMode::ReadOnly);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Attempt to write to the read-only file
@@ -93,13 +100,33 @@ TEST_F(StdPageIOTest, WriteReadOnly) {
 
 TEST_F(StdPageIOTest, OpenNonExistentReadOnly) {
     // Attempt to open a non-existent file in read-only mode
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadOnly).code(), Code::FileErr);
-    EXPECT_FALSE(pageIO->isOpen());
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadOnly);
+    EXPECT_FALSE(r.isOk());
+    EXPECT_TRUE(r.isErr());
+}
+
+TEST_F(StdPageIOTest, OpenFailsOnIncorrectFileSize) {
+    // Prepare incorrectly sized page to write
+    uint16_t wrongSize = PAGE_SIZE + 117;
+    std::vector<uint8_t> page(wrongSize, 0x67);
+
+    // Write to file directly with fstream
+    std::fstream file(path, std::ios::binary | std::ios::out);
+    file.write(reinterpret_cast<char *>(page.data()), page.size());
+    file.close();
+
+    // Construct a new PageIO for writing to file
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isErr());
+    EXPECT_EQ(r.error().code(), Status::Code::FileErr);
 }
 
 TEST_F(StdPageIOTest, OffsetCorrectness) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare two pages of data to write
@@ -133,8 +160,10 @@ TEST_F(StdPageIOTest, OffsetCorrectness) {
 }
 
 TEST_F(StdPageIOTest, OutOfBounds) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a buffer to read into
@@ -150,8 +179,10 @@ TEST_F(StdPageIOTest, OutOfBounds) {
 }
 
 TEST_F(StdPageIOTest, FileSizeVerification) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
+    // Construct a new PageIO for writing
+    auto r = StdPageIO::open(path, OpenMode::ReadWrite);
+    EXPECT_TRUE(r.isOk());
+    pageIO = std::move(r.value());
     EXPECT_TRUE(pageIO->isOpen());
 
     // Prepare a page of data to write
@@ -168,32 +199,5 @@ TEST_F(StdPageIOTest, FileSizeVerification) {
     EXPECT_EQ(std::filesystem::file_size(filePath), 5 * PAGE_SIZE);
 
     // Close the file
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
-}
-
-TEST_F(StdPageIOTest, CloseWithoutOpen) {
-    // Attempt to close without opening a file
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
-}
-
-TEST_F(StdPageIOTest, ReadWithoutOpen) {
-    // Prepare a buffer to read into
-    std::vector<uint8_t> readData(PAGE_SIZE);
-    ByteSpan dst(readData.data(), readData.size());
-
-    // Attempt to read without opening a file
-    EXPECT_EQ(pageIO->readPage(0, dst).code(), Code::FileErr);
-}
-
-TEST_F(StdPageIOTest, OpenAlreadyOpen) {
-    // Open a new file for writing
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::Ok);
-    EXPECT_TRUE(pageIO->isOpen());
-
-    // Attempt to open the file again
-    EXPECT_EQ(pageIO->open(path, OpenMode::ReadWrite).code(), Code::FileErr);
-    EXPECT_TRUE(pageIO->isOpen());
-
-    // Clean up
     EXPECT_EQ(pageIO->close().code(), Code::Ok);
 }
