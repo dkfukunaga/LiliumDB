@@ -48,13 +48,17 @@ private:
         bool        dirty    = false;           // flush on eviction if dirty
     };
 
-    std::unique_ptr<PageIO> pageIO_;
+    LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
+        : pageIO_(std::move(pageIO))
+        , pool_(poolSize * PAGE_SIZE)
+        , frames_(poolSize) { }
 
+    std::unique_ptr<PageIO> pageIO_;
     uint32_t pageCount;
     PageNum freespaceHead;
     PageNum appendStart;
+    FrameIndex nextFreeFrame_ = 0;
 
-    size_t nextFreeFrame_ = 0;
     // buffer pool of poolSize * PAGE_SIZE bytes
     std::vector<uint8_t> pool_;
     // vector of frames that point into pool_
@@ -65,11 +69,6 @@ private:
     std::list<FrameIndex> lruList_;
     // map page number to frame index
     std::unordered_map<PageNum, std::list<FrameIndex>::iterator> pageMap_;
-
-    LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
-        : pageIO_(std::move(pageIO))
-        , pool_(poolSize * PAGE_SIZE)
-        , frames_(poolSize) { }
 
     void markDirty(PageNum pageNum) noexcept override;
     void pinPage(PageNum pageNum) noexcept override;
