@@ -15,30 +15,6 @@ using RecordSize = uint16_t;
 inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
 inline constexpr SlotNum INVALID_SLOT = std::numeric_limits<SlotNum>::max();
 
-struct RID {
-    PageNum page;
-    SlotNum slot;
-
-    bool operator==(const RID& other) const {
-        return page == other.page && slot == other.slot;
-    }
-    bool operator!=(const RID& other) const {
-        return !(*this == other);
-    }
-    bool operator<(const RID& other) const {
-        return page < other.page || (page == other.page && slot < other.slot);
-    }
-    bool operator>(const RID& other) const {
-        return page > other.page || (page == other.page && slot > other.slot);
-    }
-    bool operator<=(const RID& other) const {
-        return !(*this > other);
-    }
-    bool operator>=(const RID& other) const {
-        return !(*this < other);
-    }
-};
-
 } // namespace LiliumDB
 
 #endif
