@@ -12,6 +12,9 @@ namespace LiliumDB {
 
 class ByteView;
 
+// Non-owning mutable view over a contiguous byte buffer.
+// Bounds-checked via exceptions; use operator[] for unchecked access.
+// Does not manage lifetime — caller must ensure the buffer outlives this span.
 class ByteSpan {
 public:
     constexpr ByteSpan(): data_(nullptr), size_(0) { }
@@ -23,10 +26,13 @@ public:
     [[nodiscard]] constexpr ByteSpan    subspan(size_t start, size_t len);
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
 
-    void                            write(size_t start, const uint8_t* src, size_t len);
-    void                            write(size_t start, const ByteView& src);
-    template <typename T> void      write(size_t start, const T value);
-    void                            copy_within(size_t to, size_t from, size_t len);
+    // Writes sizeof(T) bytes of value at start. Throws if out of range.
+    template <typename T> void          put(size_t start, const T value);
+    // Copies len bytes from src into this span starting at start.
+    void                                write(size_t start, const uint8_t* src, size_t len);
+    // Copies len bytes within this span from [from, from+len) to [to, to+len).
+    // Safe for overlapping regions.
+    void                                copy_within(size_t to, size_t from, size_t len);
 
     constexpr uint8_t*                  data() noexcept { return data_; }
     constexpr const uint8_t*            data() const noexcept { return data_; }
@@ -59,6 +65,10 @@ private:
     size_t      size_;
 };
 
+// Non-owning read-only view over a contiguous byte buffer.
+// Bounds-checked via exceptions; use operator[] for unchecked access.
+// Implicitly constructible from ByteSpan.
+// Does not manage lifetime — caller must ensure the buffer outlives this span.
 class ByteView {
 public:
     constexpr ByteView(): data_(nullptr), size_(0) { }
@@ -70,8 +80,10 @@ public:
     constexpr uint8_t                   at(size_t offset) const;
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
 
-    void                            read(size_t start, uint8_t* dst, size_t len) const;
-    template <typename T> T         read(size_t start) const;
+    // Reads sizeof(T) bytes at start from this view and returns as T. Throws if out of range.
+    template <typename T> T             get(size_t start) const;
+    // Copies len bytes from this view into dst starting at start.
+    void                                read(size_t start, uint8_t* dst, size_t len) const;
 
     constexpr const uint8_t*            data() const noexcept { return data_; }
     constexpr size_t                    size() const noexcept { return size_; }
@@ -119,21 +131,17 @@ constexpr ByteView ByteSpan::subview(size_t start, size_t len) const {
         throw std::out_of_range("subview out of range");
 }
 
-inline void ByteSpan::write(size_t start, const uint8_t* src, size_t len) {
-    if (start <= size_ && len <= size_ - start)
-        std::memcpy(data_ + start, src, len);
+template <typename T>
+inline void ByteSpan::put(size_t start, const T value) {
+    if (start <= size_ && sizeof(T) <= size_ - start)
+        std::memcpy(data_ + start, &value, sizeof(T));
     else
         throw std::out_of_range("destination out of range");
 }
 
-inline void ByteSpan::write(size_t start, const ByteView& src) {
-    write(start, src.data(), src.size());
-}
-
-template <typename T>
-inline void ByteSpan::write(size_t start, const T value) {
-    if (start <= size_ && sizeof(T) <= size_ - start)
-        std::memcpy(data_ + start, &value, sizeof(T));
+inline void ByteSpan::write(size_t start, const uint8_t* src, size_t len) {
+    if (start <= size_ && len <= size_ - start)
+        std::memcpy(data_ + start, src, len);
     else
         throw std::out_of_range("destination out of range");
 }
@@ -161,15 +169,8 @@ constexpr ByteView ByteView::subview(size_t start, size_t len) const {
         throw std::out_of_range("subview out of range");
 }
 
-constexpr void ByteView::read(size_t start, uint8_t* dst, size_t len) const {
-    if (start <= size_ && len <= size_ - start)
-        std::memcpy(dst, data_ + start, len);
-    else
-        throw std::out_of_range("read out of range");
-}
-
 template <typename T>
-inline T ByteView::read(size_t start) const {
+inline T ByteView::get(size_t start) const {
     T value;
     if (start <= size_ && sizeof(T) <= size_ - start)
         memcpy(&value, data_ + start, sizeof(T));
@@ -179,16 +180,23 @@ inline T ByteView::read(size_t start) const {
     return value;
 }
 
+inline void ByteView::read(size_t start, uint8_t* dst, size_t len) const {
+    if (start <= size_ && len <= size_ - start)
+        std::memcpy(dst, data_ + start, len);
+    else
+        throw std::out_of_range("read out of range");
+}
+
+} // namespace LiliumDB
+
 // Helper macros
 
 #define SPAN_WRITE_FIELD(span, header, field)                               \
-    (span).write<decltype(std::decay_t<decltype(header)>::field)>(          \
+    (span).put<decltype(std::decay_t<decltype(header)>::field)>(            \
         offsetof(std::decay_t<decltype(header)>, field), (header).field)
 
 #define VIEW_READ_FIELD(view, header, field)                        \
-    (view).read<decltype(std::decay_t<decltype(header)>::field)>(   \
+    (view).get<decltype(std::decay_t<decltype(header)>::field)>(    \
         offsetof(std::decay_t<decltype(header)>, field))
-
-} // namespace LiliumDB
 
 #endif
