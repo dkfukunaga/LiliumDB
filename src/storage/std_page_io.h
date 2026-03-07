@@ -4,7 +4,7 @@
 #include "page_io.h"
 
 #include "common/core.h"
-#include "common/byte_span.h"
+#include "utils/byte_span.h"
 
 #include <fstream>
 #include <memory>

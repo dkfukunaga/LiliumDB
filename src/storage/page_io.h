@@ -2,7 +2,7 @@
 #define LILIUMDB_PAGE_IO_H
 
 #include "common/core.h"
-#include "common/byte_span.h"
+#include "utils/byte_span.h"
 
 namespace LiliumDB {
 

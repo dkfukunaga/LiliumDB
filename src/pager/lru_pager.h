@@ -5,7 +5,7 @@
 
 #include "common/core.h"
 #include "common/file_format.h"
-#include "common/byte_span.h"
+#include "utils/byte_span.h"
 #include "storage/page_io.h"
 #include "pager/page_guard.h"
 
@@ -26,11 +26,11 @@ public:
         open(std::string_view path, OpenMode mode, size_t poolSize = DEFAULT_POOL_SIZE);
     ~LRUPager() noexcept { if (isOpen()) close(); } // errors silently discarded on destruction
 
-    bool                isOpen() const override { return pageIO_->isOpen(); }
-    VoidResult          close() override;
+    bool                    isOpen() const override { return pageIO_->isOpen(); }
+    VoidResult              close() override;
 
-    DbResult<PageGuard>   fetchPage(PageNum pageNum) override;
-    DbResult<PageGuard>   newPage(PageType type) override;
+    DbResult<PageGuard>     fetchPage(PageNum pageNum) override;
+    DbResult<PageGuard>     newPage(PageType type) override;
     VoidResult              deletePage(PageNum pageNum) override;
 
     VoidResult              flushPage(PageNum pageNum) override;

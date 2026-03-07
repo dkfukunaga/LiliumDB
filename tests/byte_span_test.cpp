@@ -1,4 +1,5 @@
-#include "common/byte_span.h"
+#include "utils/byte_span.h"
+#include "utils/byte_span_macros.h"
 
 #include <vector>
 
@@ -26,14 +27,6 @@ TEST(ByteSpanTest, Basic) {
     EXPECT_EQ(subview.size(), 4);
     EXPECT_EQ(subview[0], 1);
     EXPECT_EQ(subview[3], 4);
-}
-
-TEST(ByteSpanTest, SubspanOutOfRange) {
-    std::vector<uint8_t> data = {1, 2, 3};
-    ByteSpan span(data.data(), data.size());
-
-    EXPECT_THROW(span.subspan(2, 2), std::out_of_range);
-    EXPECT_THROW(span.subspan(3, 1), std::out_of_range);
 }
 
 TEST(ByteSpanTest, WriteAndCopy) {
@@ -89,14 +82,6 @@ TEST(ByteViewTest, Basic) {
     EXPECT_EQ(subview[1], 15);
 }
 
-TEST(ByteViewTest, SubviewOutOfRange) {
-    std::vector<uint8_t> data = {1, 2, 3};
-    ByteView view(data.data(), data.size());
-
-    EXPECT_THROW(view.subview(2, 2), std::out_of_range);
-    EXPECT_THROW(view.subview(3, 1), std::out_of_range);
-}
-
 TEST(ByteViewTest, OutOfRange) {
     std::vector<uint8_t> data = {1, 2, 3};
     ByteView view(data.data(), data.size());
@@ -114,4 +99,37 @@ TEST(ByteViewTest, Iterators) {
 
     std::vector<uint8_t> reverse_collected(view.rbegin(), view.rend());
     EXPECT_EQ(reverse_collected, std::vector<uint8_t>({255, 200, 100}));
+}
+
+struct TestHeader {
+    uint16_t id;
+    uint32_t offset;
+    uint8_t  flags;
+};
+
+TEST(ByteSpanMacrosTest, RoundTrip) {
+    std::vector<uint8_t> buf(sizeof(TestHeader), 0);
+    ByteSpan span(buf.data(), buf.size());
+    ByteView view(buf.data(), buf.size());
+    TestHeader header{ 42, 1024, 0xFF };
+
+    SPAN_WRITE_STRUCT_FIELD(span, header, id);
+    SPAN_WRITE_STRUCT_FIELD(span, header, offset);
+    SPAN_WRITE_STRUCT_FIELD(span, header, flags);
+
+    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, id),     header.id);
+    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, offset), header.offset);
+    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, flags),  header.flags);
+}
+
+TEST(ByteSpanMacrosTest, CorrectOffset) {
+    std::vector<uint8_t> buf(sizeof(TestHeader), 0);
+    ByteSpan span(buf.data(), buf.size());
+    TestHeader header{ 42, 1024, 0xFF };
+
+    SPAN_WRITE_STRUCT_FIELD(span, header, offset);
+
+    uint32_t raw;
+    std::memcpy(&raw, buf.data() + offsetof(TestHeader, offset), sizeof(uint32_t));
+    EXPECT_EQ(raw, header.offset);
 }

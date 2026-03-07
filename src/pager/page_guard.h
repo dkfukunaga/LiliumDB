@@ -2,7 +2,7 @@
 #define LILIUMDB_PAGE_GUARD_H
 
 #include "common/types.h"
-#include "common/byte_span.h"
+#include "utils/byte_span.h"
 
 namespace LiliumDB {
 

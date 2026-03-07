@@ -1,6 +1,7 @@
 #include "lru_pager.h"
 
 #include "storage/std_page_io.h"
+#include "utils/byte_span_macros.h"
 
 #include <cstddef>
 #include <cstring>
