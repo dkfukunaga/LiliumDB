@@ -10,7 +10,7 @@
 namespace LiliumDB {
 
 //  magic bytes: CAT_CAFE LDB\0
-inline constexpr std::array<uint8_t, 8> MAGIC = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
+inline constexpr std::array<uint8_t, 8> MAGIC_BYTES = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
 
 // current version is 0.0
 inline constexpr uint8_t VERSION_MAJOR = 0;
