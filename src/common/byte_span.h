@@ -191,11 +191,11 @@ inline void ByteView::read(size_t start, uint8_t* dst, size_t len) const {
 
 // Helper macros
 
-#define SPAN_WRITE_FIELD(span, header, field)                               \
+#define SPAN_WRITE_STRUCT_FIELD(span, header, field)                        \
     (span).put<decltype(std::decay_t<decltype(header)>::field)>(            \
         offsetof(std::decay_t<decltype(header)>, field), (header).field)
 
-#define VIEW_READ_FIELD(view, header, field)                        \
+#define VIEW_READ_STRUCT_FIELD(view, header, field)                 \
     (view).get<decltype(std::decay_t<decltype(header)>::field)>(    \
         offsetof(std::decay_t<decltype(header)>, field))
 
