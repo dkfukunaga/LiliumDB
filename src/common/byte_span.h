@@ -2,7 +2,7 @@
 #define LILIUMDB_BYTE_SPAN_H
 
 #include <cstdint>      // uint8_t
-#include <cstddef>      // size_t
+#include <cstddef>      // size_t, offsetof
 #include <cstring>      // memcpy, memmove
 #include <stdexcept>    // std::out_of_range
 #include <cassert>      // assert
@@ -25,6 +25,7 @@ public:
 
     void                            write(size_t start, const uint8_t* src, size_t len);
     void                            write(size_t start, const ByteView& src);
+    template <typename T> void      write(size_t start, const T value);
     void                            copy_within(size_t to, size_t from, size_t len);
 
     uint8_t*                        data() noexcept { return data_; }
@@ -69,6 +70,7 @@ public:
     [[nodiscard]] ByteView          subview(size_t start, size_t len) const;
 
     void                            read(size_t start, uint8_t* dst, size_t len) const;
+    template <typename T> T         read(size_t start) const;
 
     const uint8_t*                  data() const noexcept { return data_; }
     size_t                          size() const noexcept { return size_; }
@@ -126,6 +128,14 @@ inline void ByteSpan::write(size_t start, const ByteView& src) {
     write(start, src.data(), src.size());
 }
 
+template <typename T>
+inline void ByteSpan::write(size_t start, const T value) {
+    if (start <= size_ && sizeof(T) <= size_ - start)
+        std::memcpy(data_ + start, &value, sizeof(T));
+    else
+        throw std::out_of_range("destination out of range");
+}
+
 inline void ByteSpan::copy_within(size_t to, size_t from, size_t len) {
     if (to <= size_ && from <= size_ && len <= size_ - to && len <= size_ - from)
         std::memmove(data_ + to, data_ + from, len);
@@ -155,6 +165,27 @@ inline void ByteView::read(size_t start, uint8_t* dst, size_t len) const {
     else
         throw std::out_of_range("read out of range");
 }
+
+template <typename T>
+inline T ByteView::read(size_t start) const {
+    T value;
+    if (start <= size_ && sizeof(T) <= size_ - start)
+        memcpy(&value, data_ + start, sizeof(T));
+    else
+        throw std::out_of_range("read out of range");
+    
+    return value;
+}
+
+// Helper macros
+
+#define SPAN_WRITE_FIELD(span, header, field)                               \
+    (span).write<decltype(std::decay_t<decltype(header)>::field)>(          \
+        offsetof(std::decay_t<decltype(header)>, field), (header).field)
+
+#define VIEW_READ_FIELD(view, header, field)                        \
+    (view).read<decltype(std::decay_t<decltype(header)>::field)>(   \
+        offsetof(std::decay_t<decltype(header)>, field))
 
 } // namespace LiliumDB
 
