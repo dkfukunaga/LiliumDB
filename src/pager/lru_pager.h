@@ -3,10 +3,8 @@
 
 #include "pager.h"
 
-#include "common/types.h"
+#include "common/core.h"
 #include "common/file_format.h"
-#include "common/status.h"
-#include "common/result.h"
 #include "common/byte_span.h"
 #include "storage/page_io.h"
 #include "pager/page_guard.h"
@@ -24,7 +22,7 @@ class LRUPager : public Pager {
 public:
     static constexpr size_t DEFAULT_POOL_SIZE = 64;
 
-    static Result<std::unique_ptr<LRUPager>>
+    static Result<std::unique_ptr<Pager>>
         open(std::string_view path, OpenMode mode, size_t poolSize = DEFAULT_POOL_SIZE);
     ~LRUPager() noexcept { if (isOpen()) close(); } // errors silently discarded on destruction
 
@@ -40,6 +38,7 @@ public:
 
 private:
     using FrameIndex = size_t;
+    using FrameIter = std::list<FrameIndex>::iterator;
 
     struct Frame {
         ByteSpan    data;                       // points into pool_ at frame offset
@@ -64,12 +63,19 @@ private:
     // the iterator from pageMap_
     std::list<FrameIndex> lruList_;
     // map page number to frame index
-    std::unordered_map<PageNum, std::list<FrameIndex>::iterator> pageMap_;
+    std::unordered_map<PageNum, FrameIter> pageMap_;
 
     LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
         : pageIO_(std::move(pageIO))
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
+
+    bool validateFileHeader(ByteView header) const;
+    Status initFile();
+    FrameIndex allocateFrame(PageNum pageNum);
+    FrameIndex evictLastUsedPage();
+    Status serializeFileHeader(FileHeader header);
+    Result<FileHeader> deserializeFileHeader() const;
 
     void markDirty(PageNum pageNum) noexcept override;
     void pinPage(PageNum pageNum) noexcept override;
