@@ -10,12 +10,12 @@ namespace LiliumDB {
 
 Result<std::unique_ptr<Pager>>
 LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
-    TRY_RESULT_BIND(StdPageIO::open(path, mode), p);
+    TRY_RESULT_BIND(StdPageIO::open(path, mode), pio);
 
-    LRUPager* lruPager = new LRUPager(std::move(p), poolSize);
+    LRUPager* lruPager = new LRUPager(std::move(pio), poolSize);
 
     if (lruPager->pageIO_->pageCount() == 0) { // new uninitialized file
-        lruPager->initFile();
+        TRY_RESULT_WRAP(lruPager->initFile());
     }
 
     std::unique_ptr<Pager> pager(lruPager);
@@ -29,7 +29,7 @@ bool LRUPager::validateFileHeader(ByteView header) const {
     header.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
 
     // read flags
-    FileFlags flags = header.read<FileFlags>(offsetof(FileHeader, fileFlags));
+    FileFlags flags = header.get<FileFlags>(offsetof(FileHeader, fileFlags));
 
     // read version
     uint8_t vMajor, vMinor;
@@ -59,44 +59,43 @@ Status LRUPager::initFile() {
     header.checksum = CHECKSUM_PLACEHOLDER;
 
     // allocate new page zero
-    allocateFrame(0);
+    TRY_STATUS(allocatePage(0));
 
     // write file header to page zero
-    auto s = serializeFileHeader(header);
-
-    if (!s.isOk()) {
-        return s;
-    }
-    return Status::ok();
+    return serializeFileHeader(header);
 }
 
-LRUPager::FrameIndex LRUPager::allocateFrame(PageNum pageNum) {
-    FrameIndex idx = nextFreeFrame_ < frames_.size() ? nextFreeFrame_++ : evictLastUsedPage();
-    Frame frame{ByteSpan(&pool_.data()[idx * PAGE_SIZE], PAGE_SIZE), pageNum, 0, false};
+Result<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
+    FrameIndex index;
+    if (nextFreeFrame_ < frames_.size()) {
+        index = nextFreeFrame_++;
+    } else {
+        TRY_RESULT_BIND(evictLastUsedPage(), temp);
+        index = temp;
+    }
+    Frame frame(pool_, index, pageNum);
 
-    frames_[idx] = frame;
-    auto iter = lruList_.emplace(lruList_.begin(), idx);
+    frames_[index] = frame;
+    auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
-    return idx;
+    return Ok(index);
 }
 
 Status LRUPager::serializeFileHeader(FileHeader header) {
-    TRY_STATUS_BIND(fetchPage(0), pg);
+    TRY_STATUS_BIND(fetchPage(0), pageGuard);
 
     // serialize header
-    ByteSpan span = pg.span();
-
-    span.write(0, header.magicBytes, sizeof(header.magicBytes));
-    SPAN_WRITE_FIELD(span, header, fileFlags);
-    SPAN_WRITE_FIELD(span, header, versionMajor);
-    SPAN_WRITE_FIELD(span, header, versionMinor);
-    SPAN_WRITE_FIELD(span, header, pageCount);
-    SPAN_WRITE_FIELD(span, header, fileCreated);
-    SPAN_WRITE_FIELD(span, header, lastModified);
-    SPAN_WRITE_FIELD(span, header, freespaceHead);
+    pageGuard.span().write(0, header.magicBytes, sizeof(header.magicBytes));
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, fileFlags);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, versionMajor);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, versionMinor);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, pageCount);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, fileCreated);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, lastModified);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, freespaceHead);
     // skip reserved bytes
-    SPAN_WRITE_FIELD(span, header, checksum);
+    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, checksum);
 
     return Status::ok();
 }

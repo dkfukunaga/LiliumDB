@@ -45,15 +45,14 @@ private:
         PageNum     pageNum  = INVALID_PAGE;    // which page is loaded, INVALID_PAGE if empty
         uint32_t    pinCount = 0;               // count of PageGuards accessing page
         bool        dirty    = false;           // flush on eviction if dirty
+
+        Frame() = default;
+        Frame(std::vector<uint8_t>& dat, FrameIndex idx, PageNum pn)
+            : data(ByteSpan(&dat.data()[idx * PAGE_SIZE], PAGE_SIZE))
+            , pageNum(pn) { }
     };
 
-    LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
-        : pageIO_(std::move(pageIO))
-        , pool_(poolSize * PAGE_SIZE)
-        , frames_(poolSize) { }
-
     std::unique_ptr<PageIO> pageIO_;
-    uint32_t pageCount;
     PageNum freespaceHead;
     PageNum appendStart;
     FrameIndex nextFreeFrame_ = 0;
@@ -76,8 +75,8 @@ private:
 
     bool validateFileHeader(ByteView header) const;
     Status initFile();
-    FrameIndex allocateFrame(PageNum pageNum);
-    FrameIndex evictLastUsedPage();
+    Result<FrameIndex> allocatePage(PageNum pageNum);
+    Result<FrameIndex> evictLastUsedPage();
     Status serializeFileHeader(FileHeader header);
     Result<FileHeader> deserializeFileHeader() const;
 
