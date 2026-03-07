@@ -3,9 +3,7 @@
 
 #include "page_io.h"
 
-#include "common/types.h"
-#include "common/status.h"
-#include "common/result.h"
+#include "common/core.h"
 #include "common/byte_span.h"
 
 #include <fstream>
