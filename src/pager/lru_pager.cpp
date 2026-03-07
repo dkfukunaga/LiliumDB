@@ -12,34 +12,45 @@ Result<std::unique_ptr<Pager>>
 LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     TRY_RESULT_BIND(StdPageIO::open(path, mode), pio);
 
-    LRUPager* lruPager = new LRUPager(std::move(pio), poolSize);
+    std::unique_ptr<LRUPager> lruPager(new LRUPager(std::move(pio), poolSize));
 
     if (lruPager->pageIO_->pageCount() == 0) { // new uninitialized file
         TRY_RESULT_WRAP(lruPager->initFile());
     }
+    
+    TRY_RESULT_WRAP(lruPager->validateFileHeader());
 
-    std::unique_ptr<Pager> pager(lruPager);
+    std::unique_ptr<Pager> pager = std::move(lruPager);
     return Ok(std::move(pager));
 }
 
-bool LRUPager::validateFileHeader(ByteView header) const {
-    // read magic bytes
+Status LRUPager::validateFileHeader() {
+    TRY_STATUS_BIND(fetchPage(0), pageGuard);
+    ByteView header = pageGuard.view().subview(0, sizeof(FileHeader));
+
+    // check magic bytes
     constexpr size_t mBytesLen = sizeof(FileHeader::magicBytes);
     uint8_t mBytes[mBytesLen];
     header.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
+    if (memcmp(mBytes, MAGIC_BYTES.data(), mBytesLen) != 0) {
+        return Status::fileInvalid("Incorrect file type.");
+    }
 
-    // read flags
+    // check for corrupt flag
     FileFlags flags = header.get<FileFlags>(offsetof(FileHeader, fileFlags));
+    if (flags.has(FileFlag::Corrupt)) {
+        return Status::corrupt("File is corrupt.");
+    }
 
-    // read version
-    uint8_t vMajor, vMinor;
-    header.read(offsetof(FileHeader, versionMajor), &vMajor, 1);
-    header.read(offsetof(FileHeader, versionMinor), &vMinor, 1);
+    // check major version
+    uint8_t vMajor = header.get<uint8_t>(offsetof(FileHeader, versionMajor));
+    if (vMajor != VERSION_MAJOR) {
+        return Status::fileInvalid("Incompatible file version.");
+    }
 
-    return memcmp(mBytes, MAGIC_BYTES.data(), mBytesLen) == 0
-           && !flags.has(FileFlag::Corrupt)
-           && vMajor == VERSION_MAJOR
-           && vMinor == VERSION_MINOR;
+    // read pageCount
+    appendStart_ = header.get<uint32_t>(offsetof(FileHeader, pageCount));
+    return Status::ok();
 }
 
 Status LRUPager::initFile() {

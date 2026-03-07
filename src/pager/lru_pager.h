@@ -53,8 +53,8 @@ private:
     };
 
     std::unique_ptr<PageIO> pageIO_;
-    PageNum freespaceHead;
-    PageNum appendStart;
+    PageNum freespaceHead_;
+    PageNum appendStart_;
     FrameIndex nextFreeFrame_ = 0;
 
     // buffer pool of poolSize * PAGE_SIZE bytes
@@ -73,12 +73,12 @@ private:
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
 
-    bool validateFileHeader(ByteView header) const;
-    Status initFile();
-    Result<FrameIndex> allocatePage(PageNum pageNum);
-    Result<FrameIndex> evictLastUsedPage();
-    Status serializeFileHeader(FileHeader header);
-    Result<FileHeader> deserializeFileHeader() const;
+    Status              validateFileHeader();
+    Status              initFile();
+    Result<FrameIndex>  allocatePage(PageNum pageNum);
+    Result<FrameIndex>  evictLastUsedPage();
+    Status              serializeFileHeader(FileHeader header);
+    Result<FileHeader>  deserializeFileHeader();
 
     void markDirty(PageNum pageNum) noexcept override;
     void pinPage(PageNum pageNum) noexcept override;
