@@ -271,6 +271,23 @@ Pager::open() on new file:
 
 
 
+Pager::open(path, mode):
+    → create a new PageIO instance
+    → construct a new Pager instance
+        → takes PageIO as parameter
+        → initializes buffer pool
+    → if file is new (pageCount = ):
+        → create new page 0
+        → initialize a new file header
+        → write file header to page
+        → set file header metadata to defaults (pageCount = 1, freeSpaceHead = INVALID_PAGE)
+    → else:
+        → read page 0
+        → validate file header (magic bytes, version)
+        → load file header metadata (pageCount, freeSpaceHead)
+    → return Pager instance
+
+
 
 Pager
     - have pool size be a constructor parameter
@@ -314,6 +331,7 @@ first write operation:
                 → allocate requested page
         → Catalog writes sys_tables and sys_columns bootstrap data
         → system tables now exist, normal operations proceed
+
 
 
 
