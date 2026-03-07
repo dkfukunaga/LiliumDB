@@ -5,7 +5,7 @@
 #include <array>
 
 #include "types.h"
-#include "flags.h"
+#include "utils/flags.h"
 
 namespace LiliumDB {
 

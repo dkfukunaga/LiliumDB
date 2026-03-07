@@ -4,7 +4,7 @@
 
 namespace LiliumDB {
 
-Result<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, OpenMode mode) {
+DbResult<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, OpenMode mode) {
     StdPageIO* p = new StdPageIO(mode);
     std::unique_ptr<StdPageIO> stdPageIO(p);
 
@@ -45,64 +45,64 @@ Result<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, OpenMo
     return Err(Status::fileErr("Failed to open file."));
 }
 
-Status StdPageIO::close() {
+VoidResult StdPageIO::close() {
     if (isOpen()) {
         file_.close(); 
     }
 
     if (!file_.is_open()) {
-        return Status::ok();
+        return Ok(Success);
     } else {
-        return Status::fileErr("An error occurred during or after closing the file.");
+        return Err(Status::fileErr("An error occurred during or after closing the file."));
     }
 }
 
-Status StdPageIO::readPage(PageNum page, ByteSpan dst) {
+VoidResult StdPageIO::readPage(PageNum page, ByteSpan dst) {
     if (!isOpen()) {
-        return Status::fileErr("Open file before reading.");
+        return Err(Status::fileErr("Open file before reading."));
     }
 
     if (page >= pageCount_) {
-        return Status::ioErr("Page number out of bounds.");
+        return Err(Status::ioErr("Page number out of bounds."));
     }
 
     file_.seekg(static_cast<std::streamoff>(page) * PAGE_SIZE);
     if (!file_) {
-        return Status::ioErr("Seek failed.");
+        return Err(Status::ioErr("Seek failed."));
     }
     file_.read(reinterpret_cast<char*>(dst.data()), PAGE_SIZE);
     if (!file_) {
-        return Status::ioErr("Error on file read.");
+        return Err(Status::ioErr("Error on file read."));
     }
 
-    return Status::ok();
+    return Ok(Success);
 }
 
-Status StdPageIO::writePage(PageNum page, ByteView src) {
+VoidResult StdPageIO::writePage(PageNum page, ByteView src) {
     if (!isOpen()) {
-        return Status::fileErr("Open file before writing.");
+        return Err(Status::fileErr("Open file before writing."));
     }
     if (mode_ == OpenMode::ReadOnly) {
-        return Status::fileErr("Cannot write to read-only file.");
+        return Err(Status::fileErr("Cannot write to read-only file."));
     }
 
     if (page > pageCount_) { // allow writing to pageCount_ (appending), but not beyond
-        return Status::ioErr("Page number out of bounds.");
+        return Err(Status::ioErr("Page number out of bounds."));
     }
 
     file_.seekp(static_cast<std::streamoff>(page) * PAGE_SIZE);
     if (!file_) {
-        return Status::ioErr("Seek failed.");
+        return Err(Status::ioErr("Seek failed."));
     }
     file_.write(reinterpret_cast<const char*>(src.data()), PAGE_SIZE);
     if (!file_) {
-        return Status::ioErr("Error on file write.");
+        return Err(Status::ioErr("Error on file write."));
     }
     
     if (page == pageCount_) {
         pageCount_++;
     }
-    return Status::ok();
+    return Ok(Success);
 }
 
 

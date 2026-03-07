@@ -26,30 +26,30 @@ public:
     /// Flushes all dirty pages and closes the database file.
     /// Implementations are already open on construction;
     /// call close() for clean shutdown.
-    virtual Status close() = 0;
+    virtual VoidResult close() = 0;
 
     // --- Page Access ---
 
     /// Fetches the page with the given page number into the buffer pool.
     /// Returns a PageGuard pinning the page for the duration of its lifetime.
     /// Returns an error if the page does not exist or cannot be read.
-    virtual Result<PageGuard> fetchPage(PageNum pageNum) = 0;
+    virtual DbResult<PageGuard> fetchPage(PageNum pageNum) = 0;
 
     /// Allocates a new page of the given type and loads it into the buffer pool.
     /// Returns a PageGuard pinning the new page for the duration of its lifetime.
-    virtual Result<PageGuard> newPage(PageType type) = 0;
+    virtual DbResult<PageGuard> newPage(PageType type) = 0;
 
     /// Marks the given page as deleted and reclaims its page number for reuse.
-    virtual Status deletePage(PageNum pageNum) = 0;
+    virtual VoidResult deletePage(PageNum pageNum) = 0;
 
     // --- Durability ---
 
     /// Flushes the given dirty page to disk immediately.
     /// Has no effect if the page is not dirty or not in the buffer pool.
-    virtual Status flushPage(PageNum pageNum) = 0;
+    virtual VoidResult flushPage(PageNum pageNum) = 0;
 
     /// Flushes all dirty pages in the buffer pool to disk.
-    virtual Status flushAll() = 0;
+    virtual VoidResult flushAll() = 0;
 private:
     // PageGuard calls these directly to manage pin state and dirty tracking.
     friend class PageGuard;

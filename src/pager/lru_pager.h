@@ -22,19 +22,19 @@ class LRUPager : public Pager {
 public:
     static constexpr size_t DEFAULT_POOL_SIZE = 64;
 
-    static Result<std::unique_ptr<Pager>>
+    static DbResult<std::unique_ptr<Pager>>
         open(std::string_view path, OpenMode mode, size_t poolSize = DEFAULT_POOL_SIZE);
     ~LRUPager() noexcept { if (isOpen()) close(); } // errors silently discarded on destruction
 
     bool                isOpen() const override { return pageIO_->isOpen(); }
-    Status              close() override;
+    VoidResult          close() override;
 
-    Result<PageGuard>   fetchPage(PageNum pageNum) override;
-    Result<PageGuard>   newPage(PageType type) override;
-    Status              deletePage(PageNum pageNum) override;
+    DbResult<PageGuard>   fetchPage(PageNum pageNum) override;
+    DbResult<PageGuard>   newPage(PageType type) override;
+    VoidResult              deletePage(PageNum pageNum) override;
 
-    Status              flushPage(PageNum pageNum) override;
-    Status              flushAll() override;
+    VoidResult              flushPage(PageNum pageNum) override;
+    VoidResult              flushAll() override;
 
 private:
     using FrameIndex = size_t;
@@ -73,12 +73,12 @@ private:
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
 
-    Status              validateFileHeader();
-    Status              initFile();
-    Result<FrameIndex>  allocatePage(PageNum pageNum);
-    Result<FrameIndex>  evictLastUsedPage();
-    Status              serializeFileHeader(FileHeader header);
-    Result<FileHeader>  deserializeFileHeader();
+    VoidResult              validateFileHeader();
+    VoidResult              initFile();
+    DbResult<FrameIndex>    allocatePage(PageNum pageNum);
+    DbResult<FrameIndex>    evictLastUsedPage();
+    VoidResult              serializeFileHeader(FileHeader header);
+    DbResult<FileHeader>    deserializeFileHeader();
 
     void markDirty(PageNum pageNum) noexcept override;
     void pinPage(PageNum pageNum) noexcept override;

@@ -34,7 +34,7 @@ TEST_F(StdPageIOTest, OpenClose) {
     EXPECT_TRUE(pageIO->isOpen());
 
     // Close the file
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
     EXPECT_FALSE(pageIO->isOpen());
 }
 
@@ -51,20 +51,20 @@ TEST_F(StdPageIOTest, ReadWritePage) {
 
     // Write the page
     PageNum pageNum = 0;
-    EXPECT_EQ(pageIO->writePage(pageNum, src).code(), Code::Ok);
+    EXPECT_EQ(pageIO->writePage(pageNum, src).value(), Success);
 
     // Prepare a buffer to read into
     std::vector<uint8_t> readData(PAGE_SIZE);
     ByteSpan dst(readData.data(), readData.size());
 
     // Read the page back
-    EXPECT_EQ(pageIO->readPage(pageNum, dst).code(), Code::Ok);
+    EXPECT_EQ(pageIO->readPage(pageNum, dst).value(), Success);
 
     // Verify the data matches what was written
     EXPECT_TRUE(std::equal(src.begin(), src.end(), dst.begin()));
 
     // Clean up
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 }
 
 TEST_F(StdPageIOTest, WriteReadOnly) {
@@ -80,10 +80,10 @@ TEST_F(StdPageIOTest, WriteReadOnly) {
 
     // Write the page
     PageNum pageNum = 0;
-    EXPECT_EQ(pageIO->writePage(pageNum, src).code(), Code::Ok);
+    EXPECT_EQ(pageIO->writePage(pageNum, src).value(), Success);
 
     // Close the file
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 
     // Construct a new PageIO reoping the file in read-only mode
     r = StdPageIO::open(path, OpenMode::ReadOnly);
@@ -92,10 +92,10 @@ TEST_F(StdPageIOTest, WriteReadOnly) {
     EXPECT_TRUE(pageIO->isOpen());
 
     // Attempt to write to the read-only file
-    EXPECT_EQ(pageIO->writePage(pageNum, src).code(), Code::FileErr);
+    EXPECT_EQ(pageIO->writePage(pageNum, src).error().code(), Code::FileErr);
 
     // Clean up
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 }
 
 TEST_F(StdPageIOTest, OpenNonExistentReadOnly) {
@@ -136,10 +136,10 @@ TEST_F(StdPageIOTest, OffsetCorrectness) {
     ByteView src2(page2.data(), page2.size());
 
     // Write the first page
-    EXPECT_EQ(pageIO->writePage(0, src1).code(), Code::Ok);
+    EXPECT_EQ(pageIO->writePage(0, src1).value(), Success);
 
     // Write the second page
-    EXPECT_EQ(pageIO->writePage(1, src2).code(), Code::Ok);
+    EXPECT_EQ(pageIO->writePage(1, src2).value(), Success);
 
     // Prepare buffers to read into
     std::vector<uint8_t> readData1(PAGE_SIZE);
@@ -148,15 +148,15 @@ TEST_F(StdPageIOTest, OffsetCorrectness) {
     ByteSpan dst2(readData2.data(), readData2.size());
 
     // Read the first page back
-    EXPECT_EQ(pageIO->readPage(0, dst1).code(), Code::Ok);
+    EXPECT_EQ(pageIO->readPage(0, dst1).value(), Success);
     EXPECT_TRUE(std::equal(src1.begin(), src1.end(), dst1.begin()));
 
     // Read the second page back
-    EXPECT_EQ(pageIO->readPage(1, dst2).code(), Code::Ok);
+    EXPECT_EQ(pageIO->readPage(1, dst2).value(), Success);
     EXPECT_TRUE(std::equal(src2.begin(), src2.end(), dst2.begin()));
 
     // Clean up
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 }
 
 TEST_F(StdPageIOTest, OutOfBounds) {
@@ -171,11 +171,11 @@ TEST_F(StdPageIOTest, OutOfBounds) {
     ByteSpan dst(readData.data(), readData.size());
 
     // Attempt to read from an out-of-bounds page
-    EXPECT_EQ(pageIO->readPage(1, dst).code(), Code::IOErr);
-    EXPECT_EQ(pageIO->readPage(5, dst).code(), Code::IOErr);
+    EXPECT_EQ(pageIO->readPage(1, dst).error().code(), Code::IOErr);
+    EXPECT_EQ(pageIO->readPage(5, dst).error().code(), Code::IOErr);
 
     // Clean up
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 }
 
 TEST_F(StdPageIOTest, FileSizeVerification) {
@@ -191,7 +191,7 @@ TEST_F(StdPageIOTest, FileSizeVerification) {
 
     // Write the page 5 times
     for (PageNum pageNum = 0; pageNum < 5; ++pageNum) {
-        EXPECT_EQ(pageIO->writePage(pageNum, src).code(), Code::Ok);
+        EXPECT_EQ(pageIO->writePage(pageNum, src).value(), Success);
     }
 
     // Verify the file size is correct (5 pages)
@@ -199,5 +199,5 @@ TEST_F(StdPageIOTest, FileSizeVerification) {
     EXPECT_EQ(std::filesystem::file_size(filePath), 5 * PAGE_SIZE);
 
     // Close the file
-    EXPECT_EQ(pageIO->close().code(), Code::Ok);
+    EXPECT_EQ(pageIO->close().value(), Success);
 }

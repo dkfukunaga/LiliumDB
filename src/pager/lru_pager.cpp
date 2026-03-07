@@ -8,24 +8,26 @@
 
 namespace LiliumDB {
 
-Result<std::unique_ptr<Pager>>
+DbResult<std::unique_ptr<Pager>>
 LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
-    TRY_RESULT_BIND(StdPageIO::open(path, mode), pio);
+    std::unique_ptr<PageIO> pio;
+    ASSIGN_OR_RETURN(pio, StdPageIO::open(path, mode));
 
     std::unique_ptr<LRUPager> lruPager(new LRUPager(std::move(pio), poolSize));
 
     if (lruPager->pageIO_->pageCount() == 0) { // new uninitialized file
-        TRY_RESULT_WRAP(lruPager->initFile());
+        RETURN_ON_ERROR(lruPager->initFile());
     }
     
-    TRY_RESULT_WRAP(lruPager->validateFileHeader());
+    RETURN_ON_ERROR(lruPager->validateFileHeader());
 
     std::unique_ptr<Pager> pager = std::move(lruPager);
     return Ok(std::move(pager));
 }
 
-Status LRUPager::validateFileHeader() {
-    TRY_STATUS_BIND(fetchPage(0), pageGuard);
+VoidResult LRUPager::validateFileHeader() {
+    PageGuard pageGuard;
+    ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
     ByteView header = pageGuard.view().subview(0, sizeof(FileHeader));
 
     // check magic bytes
@@ -33,27 +35,27 @@ Status LRUPager::validateFileHeader() {
     uint8_t mBytes[mBytesLen];
     header.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
     if (memcmp(mBytes, MAGIC_BYTES.data(), mBytesLen) != 0) {
-        return Status::fileInvalid("Incorrect file type.");
+        return Err(Status::fileInvalid("Incorrect file type."));
     }
 
     // check for corrupt flag
     FileFlags flags = header.get<FileFlags>(offsetof(FileHeader, fileFlags));
     if (flags.has(FileFlag::Corrupt)) {
-        return Status::corrupt("File is corrupt.");
+        return Err(Status::corrupt("File is corrupt."));
     }
 
     // check major version
     uint8_t vMajor = header.get<uint8_t>(offsetof(FileHeader, versionMajor));
     if (vMajor != VERSION_MAJOR) {
-        return Status::fileInvalid("Incompatible file version.");
+        return Err(Status::fileInvalid("Incompatible file version."));
     }
 
     // read pageCount
     appendStart_ = header.get<uint32_t>(offsetof(FileHeader, pageCount));
-    return Status::ok();
+    return Ok(Success);
 }
 
-Status LRUPager::initFile() {
+VoidResult LRUPager::initFile() {
     // initialize new file header
     FileHeader header;
 
@@ -70,18 +72,19 @@ Status LRUPager::initFile() {
     header.checksum = CHECKSUM_PLACEHOLDER;
 
     // allocate new page zero
-    TRY_STATUS(allocatePage(0));
+    RETURN_ON_ERROR(allocatePage(0));
 
     // write file header to page zero
     return serializeFileHeader(header);
 }
 
-Result<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
+DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
     FrameIndex index;
     if (nextFreeFrame_ < frames_.size()) {
         index = nextFreeFrame_++;
     } else {
-        TRY_RESULT_BIND(evictLastUsedPage(), temp);
+        FrameIndex temp;
+        ASSIGN_OR_RETURN(temp, evictLastUsedPage());
         index = temp;
     }
     Frame frame(pool_, index, pageNum);
@@ -93,8 +96,9 @@ Result<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
     return Ok(index);
 }
 
-Status LRUPager::serializeFileHeader(FileHeader header) {
-    TRY_STATUS_BIND(fetchPage(0), pageGuard);
+VoidResult LRUPager::serializeFileHeader(FileHeader header) {
+    PageGuard pageGuard;
+    ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
 
     // serialize header
     pageGuard.span().write(0, header.magicBytes, sizeof(header.magicBytes));
@@ -108,7 +112,7 @@ Status LRUPager::serializeFileHeader(FileHeader header) {
     // skip reserved bytes
     SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, checksum);
 
-    return Status::ok();
+    return Ok(Success);
 }
 
 } // namespace LiliumDB

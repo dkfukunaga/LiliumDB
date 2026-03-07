@@ -1,8 +1,7 @@
 #ifndef LILIUMDB_PAGE_IO_H
 #define LILIUMDB_PAGE_IO_H
 
-#include "common/types.h"
-#include "common/status.h"
+#include "common/core.h"
 #include "common/byte_span.h"
 
 namespace LiliumDB {
@@ -13,9 +12,9 @@ class PageIO {
 public:
     virtual ~PageIO() = default;
 
-    virtual Status      close() = 0;
-    virtual Status      readPage(PageNum page, ByteSpan dst) = 0;
-    virtual Status      writePage(PageNum page, ByteView src) = 0;
+    virtual VoidResult  close() = 0;
+    virtual VoidResult  readPage(PageNum page, ByteSpan dst) = 0;
+    virtual VoidResult  writePage(PageNum page, ByteView src) = 0;
     virtual bool        isOpen() const = 0;
     virtual uint32_t    pageCount() const = 0;
 };

@@ -14,6 +14,7 @@ class Pager;
 // Do not hold ByteSpan or ByteView past the lifetime of the guard.
 class PageGuard {
 public:
+    PageGuard() : pager_(nullptr), pageNum_(INVALID_PAGE), data_(), dirty_(false) { }
     /// Pins the given page in the buffer pool.
     PageGuard(Pager* pager, PageNum pageNum, ByteSpan data);
     PageGuard(const PageGuard&) = delete;

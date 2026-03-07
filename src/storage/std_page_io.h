@@ -13,12 +13,12 @@ namespace LiliumDB {
 
 class StdPageIO : public PageIO {
 public:
-    static Result<std::unique_ptr<StdPageIO>> open(std::string_view path, OpenMode mode);
+    static DbResult<std::unique_ptr<StdPageIO>> open(std::string_view path, OpenMode mode);
     ~StdPageIO() override { if (isOpen()) close(); }
 
-    Status              close() override;
-    Status              readPage(PageNum page, ByteSpan dst) override;
-    Status              writePage(PageNum page, ByteView src) override;
+    VoidResult          close() override;
+    VoidResult          readPage(PageNum page, ByteSpan dst) override;
+    VoidResult          writePage(PageNum page, ByteView src) override;
 
     bool                isOpen() const override;
     uint32_t            pageCount() const override { return pageCount_; }

@@ -1,43 +1,42 @@
-#include "common/result.h"
+#include "utils/result.h"
+#include "utils/result_macros.h"
 
 #include <gtest/gtest.h>
 
 using namespace LiliumDB;
 
 TEST(ResultTest, Basic) {
-    auto r1 = Result<int>(Ok(42));
+    auto r1 = Result<int, std::string>(Ok(42));
     EXPECT_TRUE(r1.isOk());
     EXPECT_FALSE(r1.isErr());
     EXPECT_EQ(r1.value(), 42);
 
-    auto r2 = Result<std::string>(Err(Status::fileErr("file not found")));
+    auto r2 = Result<std::string, int>(Err(404));
     EXPECT_FALSE(r2.isOk());
     EXPECT_TRUE(r2.isErr());
-    EXPECT_EQ(r2.error().code(), Status::Code::FileErr);
-    EXPECT_EQ(r2.error().message(), "file not found");
+    EXPECT_EQ(r2.error(), 404);
 }
 
 TEST(ResultTest, BoolConversion) {
-    auto r1 = Result<int>(Ok(42));
+    auto r1 = Result<int, std::string>(Ok(42));
     EXPECT_TRUE(r1);
 
-    auto r2 = Result<std::string>(Err(Status::fileErr("file not found")));
+    auto r2 = Result<std::string, int>(Err(404));
     EXPECT_FALSE(r2);
 }
 
 TEST(ResultTest, ConstAccessors) {
-    const auto r1 = Result<int>(Ok(42));
+    const auto r1 = Result<int, std::string>(Ok(42));
     EXPECT_TRUE(r1.isOk());
     EXPECT_EQ(r1.value(), 42);
 
-    const auto r2 = Result<std::string>(Err(Status::fileErr("file not found")));
+    const auto r2 = Result<std::string, int>(Err(404));
     EXPECT_TRUE(r2.isErr());
-    EXPECT_EQ(r2.error().code(), Status::Code::FileErr);
-    EXPECT_EQ(r2.error().message(), "file not found");
+    EXPECT_EQ(r2.error(), 404);
 }
 
 TEST(ResultTest, MoveOnly) {
-    auto r1 = Result<std::unique_ptr<int>>(Ok(std::make_unique<int>(42)));
+    auto r1 = Result<std::unique_ptr<int>, std::string>(Ok(std::make_unique<int>(42)));
     EXPECT_TRUE(r1.isOk());
     EXPECT_EQ(*r1.value(), 42);
 
@@ -45,39 +44,22 @@ TEST(ResultTest, MoveOnly) {
     auto val = std::move(r1).value();
     EXPECT_EQ(*val, 42);
 
-    auto r2 = Result<std::unique_ptr<int>>(Err(Status::fileErr("file not found")));
+    auto r2 = Result<std::string, std::unique_ptr<int>>(Err(std::make_unique<int>(404)));
     EXPECT_TRUE(r2.isErr());
 
     // Test rvalue accessor — move error out
     auto err = std::move(r2).error();
-    EXPECT_EQ(err.code(), Status::Code::FileErr);
-    EXPECT_EQ(err.message(), "file not found");
+    EXPECT_EQ(*err, 404);
 }
 
 TEST(ResultTest, RvalueAccessors) {
     // value() &&
-    auto val = Result<int>(Ok(42)).value();
+    auto val = Result<int, std::string>(Ok(42)).value();
     EXPECT_EQ(val, 42);
 
     // error() &&
-    auto err = Result<int>(Err(Status::fileErr("file not found"))).error();
-    EXPECT_EQ(err.code(), Status::Code::FileErr);
-    EXPECT_EQ(err.message(), "file not found");
-}
-
-TEST(ResultTest, AccessorsAssert) {
-    auto r1 = Result<int>(Ok(42));
-    EXPECT_DEATH(r1.error(), ".*");
-    r1.value(); // should not assert
-
-    auto r2 = Result<int>(Err(Status::fileErr("file not found")));
-    EXPECT_DEATH(r2.value(), ".*");
-    r2.error(); // should not assert
-}
-
-TEST(ResultTest, ErrConstructorAsserts) {
-    // Constructing Err with a non-error Status should assert
-    EXPECT_DEATH(Result<int>(Err(Status::ok())), ".*");
+    auto err = Result<std::string, int>(Err(404)).error();
+    EXPECT_EQ(err, 404);
 }
 
 TEST(ResultTest, Operators) {
@@ -90,7 +72,7 @@ TEST(ResultTest, Operators) {
         int val_;
     };
 
-    auto r1 = Result<TestClass>(Ok(TestClass(42)));
+    auto r1 = Result<TestClass, std::string>(Ok(TestClass(42)));
     EXPECT_TRUE(r1.isOk());
     EXPECT_EQ(r1->getVal(), 42);
     EXPECT_EQ((*r1).getVal(), 42);
@@ -100,36 +82,41 @@ TEST(ResultTest, Operators) {
     EXPECT_EQ(cr1->getVal(), 42);
     EXPECT_EQ((*cr1).getVal(), 42);
 
-    auto r2 = Result<TestClass>(Err(Status::fileErr("file not found")));
+    auto r2 = Result<std::string, TestClass>(Err(TestClass(42)));
     EXPECT_TRUE(r2.isErr());
     EXPECT_DEATH(r2.operator->(), ".*");
     EXPECT_DEATH(*r2, ".*");
 }
 
+TEST(ResultTest, AccessorsAssert) {
+    auto r1 = Result<int, std::string>(Ok(42));
+    EXPECT_DEATH(r1.error(), ".*");
+
+    auto r2 = Result<int, std::string>(Err(std::string("error")));
+    EXPECT_DEATH(r2.value(), ".*");
+}
+
 TEST(ResultTest, ReturnErgonomics) {
-    auto okFn = []() -> Result<int> {
+    auto okFn = []() -> Result<int, std::string> {
         return Ok(42);
     };
 
-    auto errFn = []() -> Result<int> {
-        return Err(Status::fileErr("file not found"));
-    };
-
-    auto ifFn = [](bool success) -> Result<int> {
-        if (success) {
-            return Ok(42);
-        }
-        return Err(Status::fileErr("file not found"));
+    auto errFn = []() -> Result<int, std::string> {
+        return Err(std::string("error"));
     };
 
     EXPECT_TRUE(okFn());
     EXPECT_EQ(okFn().value(), 42);
-
     EXPECT_FALSE(errFn());
-    EXPECT_EQ(errFn().error().code(), Status::Code::FileErr);
+    EXPECT_EQ(errFn().error(), "error");
+}
 
-    EXPECT_TRUE(ifFn(true));
-    EXPECT_EQ(ifFn(true).value(), 42);
-    EXPECT_FALSE(ifFn(false));
-    EXPECT_EQ(ifFn(false).error().code(), Status::Code::FileErr);
+TEST(ResultTest, Macros) {
+    auto r1 = Result<int, std::string>(Ok(42));
+    EXPECT_TRUE(r1);
+    EXPECT_EQ(r1.value(), 42);
+
+    auto r2 = Result<std::string, int>(Err(404));
+    EXPECT_FALSE(r2);
+    EXPECT_EQ(r2.error(), 404);
 }
