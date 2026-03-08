@@ -18,9 +18,9 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
 
     if (lruPager->pageIO_->pageCount() == 0) { // new uninitialized file
         RETURN_ON_ERROR(lruPager->initFile());
+    } else {
+        RETURN_ON_ERROR(lruPager->validateFileHeader());
     }
-    
-    RETURN_ON_ERROR(lruPager->validateFileHeader());
 
     std::unique_ptr<Pager> pager = std::move(lruPager);
     return Ok(std::move(pager));
@@ -29,30 +29,32 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
 VoidResult LRUPager::validateFileHeader() {
     PageGuard pageGuard;
     ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
-    ByteView header = pageGuard.view().subview(0, sizeof(FileHeader));
+    ByteView headerView = pageGuard.subview(0, sizeof(FileHeader));
 
     // check magic bytes
     constexpr size_t mBytesLen = sizeof(FileHeader::magicBytes);
     uint8_t mBytes[mBytesLen];
-    header.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
+    headerView.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
     if (memcmp(mBytes, MAGIC_BYTES.data(), mBytesLen) != 0) {
         return Err(Status::fileInvalid("Incorrect file type."));
     }
 
     // check for corrupt flag
-    FileFlags flags = header.get<FileFlags>(offsetof(FileHeader, fileFlags));
+    FileFlags flags = headerView.get<FileFlags>(offsetof(FileHeader, fileFlags));
     if (flags.has(FileFlag::Corrupt)) {
         return Err(Status::corrupt("File is corrupt."));
     }
 
     // check major version
-    uint8_t vMajor = header.get<uint8_t>(offsetof(FileHeader, versionMajor));
+    uint8_t vMajor = headerView.get<uint8_t>(offsetof(FileHeader, versionMajor));
     if (vMajor != VERSION_MAJOR) {
         return Err(Status::fileInvalid("Incompatible file version."));
     }
 
-    // read pageCount
-    appendStart_ = header.get<uint32_t>(offsetof(FileHeader, pageCount));
+    // read metadata
+    freespaceHead_ = headerView.get<PageNum>(offsetof(FileHeader, freespaceHead));
+    appendStart_ = headerView.get<PageNum>(offsetof(FileHeader, pageCount));
+
     return Ok(Success);
 }
 
@@ -60,7 +62,7 @@ VoidResult LRUPager::initFile() {
     // initialize new file header
     FileHeader header;
 
-    auto now = static_cast<int64_t>(std::time(nullptr));
+    int64_t now = static_cast<int64_t>(std::time(nullptr));
 
     std::memcpy(header.magicBytes, MAGIC_BYTES.data(), sizeof(header.magicBytes));
     header.fileFlags = FileFlags();
@@ -76,7 +78,13 @@ VoidResult LRUPager::initFile() {
     RETURN_ON_ERROR(allocatePage(0));
 
     // write file header to page zero
-    return serializeFileHeader(header);
+    RETURN_ON_ERROR(serializeFileHeader(header));
+
+    // initialize metadata
+    appendStart_ = 1;
+    freespaceHead_ = INVALID_PAGE;
+
+    return Ok(Success);
 }
 
 DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
@@ -84,9 +92,7 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
     if (nextFreeFrame_ < frames_.size()) {
         index = nextFreeFrame_++;
     } else {
-        FrameIndex temp;
-        ASSIGN_OR_RETURN(temp, evictLastUsedPage());
-        index = temp;
+        ASSIGN_OR_RETURN(index, evictLastUsedPage());
     }
     Frame frame(pool_, index, pageNum);
 
@@ -100,18 +106,19 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
 VoidResult LRUPager::serializeFileHeader(FileHeader header) {
     PageGuard pageGuard;
     ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
+    ByteSpan headerSpan = pageGuard.subspan(0, sizeof(FileHeader));
 
     // serialize header
-    pageGuard.span().write(0, header.magicBytes, sizeof(header.magicBytes));
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, fileFlags);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, versionMajor);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, versionMinor);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, pageCount);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, fileCreated);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, lastModified);
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, freespaceHead);
+    headerSpan.write(0, header.magicBytes, sizeof(header.magicBytes));
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileFlags);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMajor);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMinor);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, pageCount);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileCreated);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, lastModified);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, freespaceHead);
     // skip reserved bytes
-    SPAN_WRITE_STRUCT_FIELD(pageGuard.span(), header, checksum);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
 
     return Ok(Success);
 }
