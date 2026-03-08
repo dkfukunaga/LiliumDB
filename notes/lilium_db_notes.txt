@@ -165,10 +165,19 @@ std::unordered_map<size_t, std::list<size_t>::iterator> lruMap_;
 // the iterator from lruMap_
 std::list<size_t> lruList_;    // frame indices, ordered by recency
 
-on fetchPage(PageNum):
-pageNum → pageTable_ → frameIdx → lruMap_ → list iterator → reposition to front
-→ if found, return Result<PageGuard> built from existing frame (PageGuard pins page automatically)
-→ if not found, load new page from PageIO and return Result<PageGuard> built from new frame
+fetchPage(PageNum):
+    → find pageNum in pageMap_
+        → if found:
+            → get frameIter from lruMap_
+            → get frameIndex from lruList_
+            → reposition frameIndex to front of lruList_
+        → else:
+            → load page from PageIO
+                → allocate page in buffer pool (will evict if needed)
+                → readPage from PageIO
+        → create PageGuard(this, pageNum, frame.data) (pins from constuctor)
+        → return Ok(pageGuard)
+
 
 size_t frameIdx = pageTable_[5];           // find which frame holds page 5
 auto it = lruMap_[frameIdx];               // find where that frame is in the list
