@@ -39,9 +39,23 @@ ByteSpan PageGuard::span() {
     return data_;
 }
 
+ByteSpan PageGuard::subspan(PageOffset start, uint16_t len) {
+    assert(pager_ && "Cannot access page data from an invalid PageGuard");
+    if (!dirty_) { 
+        pager_->markDirty(pageNum_);
+        dirty_ = true;
+    }
+    return data_.subspan(start, len);
+}
+
 ByteView PageGuard::view() const {
     assert(pager_ && "Cannot access page data from an invalid PageGuard");
     return ByteView(data_);
+}
+
+ByteView PageGuard::subview(PageOffset start, uint16_t len) const {
+    assert(pager_ && "Cannot access page data from an invalid PageGuard");
+    return data_.subview(start, len);
 }
 
 PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {

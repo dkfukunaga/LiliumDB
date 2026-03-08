@@ -25,8 +25,14 @@ public:
 
     /// Returns a mutable span over the page data and marks the page dirty.
     ByteSpan    span();
+    /// Returns a mutable span over a region the page data and marks the page dirty.
+    /// ByteSpan throws std::out_of_range.
+    ByteSpan    subspan(PageOffset start, uint16_t len);
     /// Returns a read-only view over the page data.
     ByteView    view() const;
+    /// Returns a read-only view over a region the page data.
+    /// ByteView throws std::out_of_range.
+    ByteView    subview(PageOffset start, uint16_t len) const;
     PageNum     pageNum() const { return pageNum_; }
 
     PageGuard&  operator=(const PageGuard&) = delete;
