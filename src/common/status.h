@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <variant>
 
 namespace LiliumDB {
 
@@ -41,18 +40,6 @@ private:
     Code code_;
     std::string message_;
 };
-
-/// Convenience alias for Result<T, Status>.
-template<class T>
-using DbResult = Result<T, Status>;
-
-/// Convenience alias for Result<std::monostate, Status> for use with functions
-/// with no return type.
-/// Use: on a success, return Ok(Success).
-using VoidResult = DbResult<std::monostate>;
-
-/// Sentinel value for use with VoidResult.
-inline constexpr std::monostate Success{};
 
 } // namespace LiliumDB
 

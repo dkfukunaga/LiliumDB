@@ -1,4 +1,4 @@
-#include "common/status.h"
+#include "common/db_result.h"
 
 #include <gtest/gtest.h>
 
