@@ -58,20 +58,20 @@ private:
     };
 
     std::unique_ptr<PageIO> pageIO_;
-    PageNum freespaceHead_;
-    PageNum appendStart_;
-    PageNum highestAllocated_ = 0;
-    FrameIndex nextFreeFrame_ = 0;
+    PageNum                 freespaceHead_;
+    PageNum                 appendStart_;
+    PageNum                 highestAllocated_ = 0;
+    FrameIndex              nextFreeFrame_ = 0;
 
-    // buffer pool of poolSize * PAGE_SIZE bytes
+    // Buffer pool of poolSize * PAGE_SIZE bytes
     std::vector<uint8_t> pool_;
-    // vector of frames that point into pool_
+    // Vector of frames that point into pool_
     std::vector<Frame> frames_;
-    // linked list of frame indices to keep track of most recently used page
-    // any time a page is accessed, it is moved to the front of the list using
+    // Linked list of frame indices to keep track of most recently used page.
+    // Any time a page is accessed, it is moved to the front of the list using
     // the iterator from pageMap_
     std::list<FrameIndex> lruList_;
-    // map page number to lruList_ iterator
+    // Map page number to lruList_ iterator
     std::unordered_map<PageNum, FrameIter> pageMap_;
 
     LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
@@ -81,6 +81,7 @@ private:
 
     VoidResult              validateFileHeader();
     VoidResult              initFile();
+    VoidResult              initPage(PageNum pageNum, PageType type);
     DbResult<FrameIndex>    allocatePage(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     VoidResult              serializeFileHeader(FileHeader header);
