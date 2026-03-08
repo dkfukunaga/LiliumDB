@@ -4,9 +4,8 @@
 
 namespace LiliumDB {
 
-DbResult<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, OpenMode mode) {
-    StdPageIO* p = new StdPageIO(mode);
-    std::unique_ptr<StdPageIO> stdPageIO(p);
+DbResult<std::unique_ptr<PageIO>> StdPageIO::open(std::string_view path, OpenMode mode) {
+    std::unique_ptr<StdPageIO> stdPageIO(new StdPageIO(mode));
 
     std::ios::openmode om = std::ios::binary;
     switch (stdPageIO->mode_) {
@@ -20,6 +19,7 @@ DbResult<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, Open
 
     stdPageIO->file_.open(path.data(), om);
 
+    // if the file didn't open, try to create a new file in case it doesn't exist
     if (!stdPageIO->file_.is_open()) {
         // if file doesn't exist and trying to open in read-only mode,
         // return FileErr instead of NewFile, since we won't be able to read from it
@@ -32,17 +32,20 @@ DbResult<std::unique_ptr<StdPageIO>> StdPageIO::open(std::string_view path, Open
         }
     }
 
-    if (stdPageIO->file_.is_open()) {
-        stdPageIO->file_.seekg(0, std::ios::end);
-        auto fileSize = stdPageIO->file_.tellg();
-        if (fileSize % PAGE_SIZE != 0) {
-            return Err(Status::fileErr("Incorrect file size."));
-        }
-        stdPageIO->pageCount_ = static_cast<PageNum>(fileSize / PAGE_SIZE);
-        return Ok(std::move(stdPageIO));
+    // if the file still isn't open, return an error
+    if (!stdPageIO->file_.is_open()) {
+        return Err(Status::fileErr("Failed to open file."));
     }
 
-    return Err(Status::fileErr("Failed to open file."));
+    stdPageIO->file_.seekg(0, std::ios::end);
+    auto fileSize = stdPageIO->file_.tellg();
+    if (fileSize % PAGE_SIZE != 0) {
+        return Err(Status::fileErr("Incorrect file size."));
+    }
+    stdPageIO->pageCount_ = static_cast<PageNum>(fileSize / PAGE_SIZE);
+    
+    std::unique_ptr<PageIO> pageIO = std::move(stdPageIO);
+    return Ok(std::move(pageIO));
 }
 
 VoidResult StdPageIO::close() {

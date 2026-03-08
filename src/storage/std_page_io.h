@@ -13,7 +13,7 @@ namespace LiliumDB {
 
 class StdPageIO : public PageIO {
 public:
-    static DbResult<std::unique_ptr<StdPageIO>> open(std::string_view path, OpenMode mode);
+    static DbResult<std::unique_ptr<PageIO>> open(std::string_view path, OpenMode mode);
     ~StdPageIO() override { if (isOpen()) (void)close(); } // errors silently discarded on destruction
 
     VoidResult          close() override;
