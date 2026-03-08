@@ -10,6 +10,11 @@ namespace LiliumDB {
 
 // Ok and Err are tag types that wrap construction arguments to make the
 // success and error cases of Result explicit at the call site.
+//
+// These also use deduction guides for CTAD (Class Template Argument Deduction).
+// std::decay_t removes reference type (& or &&), CV-qualifiers like const,
+// etc. to give the raw by-value type. This allows references and r-values
+// to be passed to Ok()/Err() and have their type T deduced correctly.
 
 // Ok wraps a value of type T for constructing a successful Result.
 template <class T>
@@ -41,35 +46,33 @@ Err(U&&) -> Err<std::decay_t<U>>;
 template<class T, class E>
 class [[nodiscard]] Result {
 public:
-    static_assert(!std::is_same_v<T, E>, "Result<T, T> is not supported");
-
     // --- Constructors ---
 
     /// Constructs a successful Result wrapping the given value.
-    Result(Ok<T> value): data_(std::in_place_type<T>, std::move(value.val)) { }
+    Result(Ok<T> value): data_(std::in_place_index<0>, std::move(value.val)) { }
     /// Constructs a failed Result wrapping the given error.
-    Result(Err<E> error): data_(std::in_place_type<E>, std::move(error.err)) { }
+    Result(Err<E> error): data_(std::in_place_index<1>, std::move(error.err)) { }
 
     // --- Observers ---
 
     /// Returns true if the Result holds a value.
-    bool                isOk()  const noexcept { return std::holds_alternative<T>(data_); }
+    bool                isOk()  const noexcept { return data_.index() == 0; }
     /// Returns true if the Result holds an error.
-    bool                isErr() const noexcept { return std::holds_alternative<E>(data_); }
+    bool                isErr() const noexcept { return data_.index() == 1; }
     /// True if the Result holds a value, false if Result holds an error.
     explicit operator   bool()  const noexcept { return isOk(); }
 
     // --- Accessors ---
 
     /// Accesses the value. Asserts if the Result holds an error.
-    T&                  value() &       { assert(isOk()); return std::get<T>(data_); }
-    const T&            value() const & { assert(isOk()); return std::get<T>(data_); }
-    T&&                 value() &&      { assert(isOk()); return std::get<T>(std::move(data_)); }
+    T&                  value() &       { assert(isOk()); return std::get<0>(data_); }
+    const T&            value() const & { assert(isOk()); return std::get<0>(data_); }
+    T&&                 value() &&      { assert(isOk()); return std::get<0>(std::move(data_)); }
 
     /// Accesses the error. Asserts if the Result holds a value.
-    E&                  error() &       { assert(!isOk()); return std::get<E>(data_); }
-    const E&            error() const & { assert(!isOk()); return std::get<E>(data_); }
-    E&&                 error() &&      { assert(!isOk()); return std::get<E>(std::move(data_)); }
+    E&                  error() &       { assert(isErr()); return std::get<1>(data_); }
+    const E&            error() const & { assert(isErr()); return std::get<1>(data_); }
+    E&&                 error() &&      { assert(isErr()); return std::get<1>(std::move(data_)); }
 
     /// Member access and dereference operators. Assert if the Result holds an error.
     T*                  operator->() &       { return &value(); }

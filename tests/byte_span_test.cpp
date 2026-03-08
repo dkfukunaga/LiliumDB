@@ -52,8 +52,8 @@ TEST(ByteSpanTest, OutOfRange) {
     std::vector<uint8_t> data = {1, 2, 3};
     ByteSpan span(data.data(), data.size());
 
-    EXPECT_THROW(span.subspan(2, 2), std::out_of_range);
-    EXPECT_THROW(span.subview(3, 1), std::out_of_range);
+    EXPECT_THROW((void)span.subspan(2, 2), std::out_of_range);
+    EXPECT_THROW((void)span.subview(3, 1), std::out_of_range);
 }
 
 TEST(ByteSpanTest, Iterators) {
@@ -86,8 +86,8 @@ TEST(ByteViewTest, OutOfRange) {
     std::vector<uint8_t> data = {1, 2, 3};
     ByteView view(data.data(), data.size());
 
-    EXPECT_THROW(view.subview(2, 2), std::out_of_range);
-    EXPECT_THROW(view.subview(3, 1), std::out_of_range);
+    EXPECT_THROW((void)view.subview(2, 2), std::out_of_range);
+    EXPECT_THROW((void)view.subview(3, 1), std::out_of_range);
 }
 
 TEST(ByteViewTest, Iterators) {
