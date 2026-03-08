@@ -10,6 +10,11 @@ namespace LiliumDB {
 
 // Ok and Err are tag types that wrap construction arguments to make the
 // success and error cases of Result explicit at the call site.
+//
+// These also use deduction guides for CTAD (Class Template Argument Deduction).
+// std::decay_t removes reference type (& or &&), CV-qualifiers like const,
+// etc. to give the raw by-value type. This allows references and r-values
+// to be passed to Ok()/Err() and have their type T deduced correctly.
 
 // Ok wraps a value of type T for constructing a successful Result.
 template <class T>
