@@ -26,6 +26,41 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     return Ok(std::move(pager));
 }
 
+VoidResult LRUPager::close() {
+    for (Frame frame : frames_) {
+        assert(frame.pinCount == 0);
+    }
+
+    RETURN_ON_ERROR(flushAll());
+    RETURN_ON_ERROR(pageIO_->close());
+
+    return Ok(Success);
+}
+
+VoidResult LRUPager::flushPage(PageNum pageNum) {
+    if (pageNum >= appendStart_) {
+        while (pageNum >= appendStart_) {
+            RETURN_ON_ERROR(flush(appendStart_++));
+        }
+    } else {
+        RETURN_ON_ERROR(flush(pageNum));
+    }
+
+    return Ok(Success);
+}
+
+VoidResult LRUPager::flushAll() {
+    for (PageNum i = 0; i <= highestAllocated_; ++i) {
+        if (pageMap_.find(i) != pageMap_.end()) {
+            RETURN_ON_ERROR(flush(i));
+            if (i == appendStart_) {
+                ++appendStart_;
+            }
+        }
+    }
+    return Ok(Success);
+}
+
 VoidResult LRUPager::validateFileHeader() {
     PageGuard pageGuard;
     ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
@@ -100,6 +135,10 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
+    if (pageNum > highestAllocated_) {
+        ++highestAllocated_;
+    }
+
     return Ok(index);
 }
 
@@ -119,6 +158,18 @@ VoidResult LRUPager::serializeFileHeader(FileHeader header) {
     SPAN_WRITE_STRUCT_FIELD(headerSpan, header, freespaceHead);
     // skip reserved bytes
     SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
+
+    return Ok(Success);
+}
+
+VoidResult LRUPager::flush(PageNum pageNum) {
+    FrameIndex frameIndex = *pageMap_[pageNum];
+    Frame& frame = frames_[frameIndex];
+
+    if (frame.dirty) {
+        RETURN_ON_ERROR(pageIO_->writePage(pageNum, frame.data));
+        frame.dirty = false;
+    }
 
     return Ok(Success);
 }

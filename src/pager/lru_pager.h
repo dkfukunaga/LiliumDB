@@ -24,7 +24,7 @@ public:
 
     static DbResult<std::unique_ptr<Pager>>
         open(std::string_view path, OpenMode mode, size_t poolSize = DEFAULT_POOL_SIZE);
-    ~LRUPager() noexcept { if (isOpen()) close(); } // errors silently discarded on destruction
+    ~LRUPager() noexcept { if (isOpen()) (void)close(); } // errors silently discarded on destruction
 
     bool                    isOpen() const override { return pageIO_->isOpen(); }
     VoidResult              close() override;
@@ -55,6 +55,7 @@ private:
     std::unique_ptr<PageIO> pageIO_;
     PageNum freespaceHead_;
     PageNum appendStart_;
+    PageNum highestAllocated_ = 0;
     FrameIndex nextFreeFrame_ = 0;
 
     // buffer pool of poolSize * PAGE_SIZE bytes
@@ -65,7 +66,7 @@ private:
     // any time a page is accessed, it is moved to the front of the list using
     // the iterator from pageMap_
     std::list<FrameIndex> lruList_;
-    // map page number to frame index
+    // map page number to lruList_ iterator
     std::unordered_map<PageNum, FrameIter> pageMap_;
 
     LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
@@ -78,11 +79,11 @@ private:
     DbResult<FrameIndex>    allocatePage(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     VoidResult              serializeFileHeader(FileHeader header);
-    DbResult<FileHeader>    deserializeFileHeader();
+    VoidResult              flush(PageNum pageNum);
 
-    void markDirty(PageNum pageNum) noexcept override;
-    void pinPage(PageNum pageNum) noexcept override;
-    void unpinPage(PageNum pageNum) noexcept override;
+    void                    markDirty(PageNum pageNum) noexcept override;
+    void                    pinPage(PageNum pageNum) noexcept override;
+    void                    unpinPage(PageNum pageNum) noexcept override;
 };
 
 } // namespace LiliumDB
