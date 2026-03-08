@@ -3,6 +3,7 @@
 
 #include "common/types.h"
 #include "utils/byte_span.h"
+#include "pin_manager.h"
 
 namespace LiliumDB {
 
@@ -16,7 +17,7 @@ class PageGuard {
 public:
     PageGuard() : pager_(nullptr), pageNum_(INVALID_PAGE), data_(), dirty_(false) { }
     /// Pins the given page in the buffer pool.
-    PageGuard(Pager* pager, PageNum pageNum, ByteSpan data);
+    PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data);
     PageGuard(const PageGuard&) = delete;
     /// Transfers ownership of the pin; the moved-from guard becomes invalid.
     PageGuard(PageGuard&& other) noexcept;
@@ -39,7 +40,7 @@ public:
     /// Unpins the current page and transfers ownership of the incoming pin.
     PageGuard&  operator=(PageGuard&& other) noexcept;
 private:
-    Pager*      pager_;
+    PinManager* pager_;
     PageNum     pageNum_;
     ByteSpan    data_;
     bool        dirty_;

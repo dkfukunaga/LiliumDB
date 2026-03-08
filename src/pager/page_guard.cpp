@@ -7,7 +7,7 @@
 
 namespace LiliumDB {
 
-PageGuard::PageGuard(Pager* pager, PageNum pageNum, ByteSpan data)
+PageGuard::PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data)
     : pager_(pager)
     , pageNum_(pageNum)
     , data_(data)

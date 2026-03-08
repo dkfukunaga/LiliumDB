@@ -2,6 +2,7 @@
 #define LILIUMDB_LRU_PAGER_H
 
 #include "pager.h"
+#include "pin_manager.h"
 
 #include "common/core.h"
 #include "common/file_format.h"
@@ -18,7 +19,7 @@
 
 namespace LiliumDB {
 
-class LRUPager : public Pager {
+class LRUPager : public Pager, public PinManager {
 public:
     static constexpr size_t DEFAULT_POOL_SIZE = 64;
 
@@ -35,6 +36,10 @@ public:
 
     VoidResult              flushPage(PageNum pageNum) override;
     VoidResult              flushAll() override;
+
+    void                    markDirty(PageNum pageNum) noexcept override;
+    void                    pinPage(PageNum pageNum) noexcept override;
+    void                    unpinPage(PageNum pageNum) noexcept override;
 
 private:
     using FrameIndex = size_t;
@@ -80,10 +85,6 @@ private:
     DbResult<FrameIndex>    evictLastUsedPage();
     VoidResult              serializeFileHeader(FileHeader header);
     VoidResult              flush(PageNum pageNum);
-
-    void                    markDirty(PageNum pageNum) noexcept override;
-    void                    pinPage(PageNum pageNum) noexcept override;
-    void                    unpinPage(PageNum pageNum) noexcept override;
 };
 
 } // namespace LiliumDB
