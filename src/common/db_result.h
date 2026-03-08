@@ -12,14 +12,6 @@ namespace LiliumDB {
 template<class T>
 using DbResult = Result<T, Status>;
 
-/// Convenience alias for Result<std::monostate, Status> for use with functions
-/// with no return type.
-/// Use: on a success, return Ok(Success).
-using VoidResult = DbResult<std::monostate>;
-
-/// Sentinel value for use with VoidResult.
-inline constexpr std::monostate Success{};
-
 } // namespace LiliumDB
 
 #endif

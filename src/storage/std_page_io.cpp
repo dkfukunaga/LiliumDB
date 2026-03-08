@@ -48,19 +48,19 @@ DbResult<std::unique_ptr<PageIO>> StdPageIO::open(std::string_view path, OpenMod
     return Ok(std::move(pageIO));
 }
 
-VoidResult StdPageIO::close() {
+DbResult<void> StdPageIO::close() {
     if (isOpen()) {
         file_.close(); 
     }
 
     if (!file_.is_open()) {
-        return Ok(Success);
+        return Ok();
     } else {
         return Err(Status::fileErr("An error occurred during or after closing the file."));
     }
 }
 
-VoidResult StdPageIO::readPage(PageNum page, ByteSpan dst) {
+DbResult<void> StdPageIO::readPage(PageNum page, ByteSpan dst) {
     if (!isOpen()) {
         return Err(Status::fileErr("Open file before reading."));
     }
@@ -78,10 +78,10 @@ VoidResult StdPageIO::readPage(PageNum page, ByteSpan dst) {
         return Err(Status::ioErr("Error on file read."));
     }
 
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult StdPageIO::writePage(PageNum page, ByteView src) {
+DbResult<void> StdPageIO::writePage(PageNum page, ByteView src) {
     if (!isOpen()) {
         return Err(Status::fileErr("Open file before writing."));
     }
@@ -105,7 +105,7 @@ VoidResult StdPageIO::writePage(PageNum page, ByteView src) {
     if (page == pageCount_) {
         pageCount_++;
     }
-    return Ok(Success);
+    return Ok();
 }
 
 

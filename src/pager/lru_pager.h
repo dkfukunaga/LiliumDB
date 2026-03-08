@@ -28,14 +28,14 @@ public:
     ~LRUPager() noexcept { if (isOpen()) (void)close(); } // errors silently discarded on destruction
 
     bool                    isOpen() const override { return pageIO_->isOpen(); }
-    VoidResult              close() override;
+    DbResult<void>          close() override;
 
     DbResult<PageGuard>     fetchPage(PageNum pageNum) override;
     DbResult<PageGuard>     newPage(PageType type) override;
-    VoidResult              deletePage(PageNum pageNum) override;
+    DbResult<void>          deletePage(PageNum pageNum) override;
 
-    VoidResult              flushPage(PageNum pageNum) override;
-    VoidResult              flushAll() override;
+    DbResult<void>          flushPage(PageNum pageNum) override;
+    DbResult<void>          flushAll() override;
 
     void                    markDirty(PageNum pageNum) noexcept override;
     void                    pinPage(PageNum pageNum) noexcept override;
@@ -79,13 +79,13 @@ private:
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
 
-    VoidResult              validateFileHeader();
-    VoidResult              initFile();
-    VoidResult              initPage(PageNum pageNum, PageType type);
+    DbResult<void>          validateFileHeader();
+    DbResult<void>          initFile();
+    DbResult<void>          initPage(PageNum pageNum, PageType type);
     DbResult<FrameIndex>    allocatePage(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
-    VoidResult              serializeFileHeader(FileHeader header);
-    VoidResult              flush(PageNum pageNum);
+    DbResult<void>          serializeFileHeader(FileHeader header);
+    DbResult<void>          flush(PageNum pageNum);
 };
 
 } // namespace LiliumDB

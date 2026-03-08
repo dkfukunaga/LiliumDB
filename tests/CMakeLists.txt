@@ -24,10 +24,6 @@ add_executable(result_test result_test.cpp)
 target_link_libraries(result_test PRIVATE liliumdb_lib GTest::gtest_main)
 gtest_discover_tests(result_test)
 
-add_executable(db_result_test db_result_test.cpp)
-target_link_libraries(db_result_test PRIVATE liliumdb_lib GTest::gtest_main)
-gtest_discover_tests(db_result_test)
-
 add_executable(flags_test flags_test.cpp)
 target_link_libraries(flags_test PRIVATE liliumdb_lib GTest::gtest_main)
 gtest_discover_tests(flags_test)

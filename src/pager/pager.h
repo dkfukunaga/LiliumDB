@@ -26,7 +26,7 @@ public:
     /// Flushes all dirty pages and closes the database file.
     /// Implementations are already open on construction;
     /// call close() for clean shutdown.
-    virtual VoidResult close() = 0;
+    virtual DbResult<void> close() = 0;
 
     // --- Page Access ---
 
@@ -40,16 +40,16 @@ public:
     virtual DbResult<PageGuard> newPage(PageType type) = 0;
 
     /// Marks the given page as deleted and reclaims its page number for reuse.
-    virtual VoidResult deletePage(PageNum pageNum) = 0;
+    virtual DbResult<void> deletePage(PageNum pageNum) = 0;
 
     // --- Durability ---
 
     /// Flushes the given dirty page to disk immediately.
     /// Has no effect if the page is not dirty or not in the buffer pool.
-    virtual VoidResult flushPage(PageNum pageNum) = 0;
+    virtual DbResult<void> flushPage(PageNum pageNum) = 0;
 
     /// Flushes all dirty pages in the buffer pool to disk.
-    virtual VoidResult flushAll() = 0;
+    virtual DbResult<void> flushAll() = 0;
 };
 
 } // namespace LiliumDB

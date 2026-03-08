@@ -12,11 +12,11 @@ class PageIO {
 public:
     virtual ~PageIO() = default;
 
-    virtual VoidResult  close() = 0;
-    virtual VoidResult  readPage(PageNum page, ByteSpan dst) = 0;
-    virtual VoidResult  writePage(PageNum page, ByteView src) = 0;
-    virtual bool        isOpen() const = 0;
-    virtual uint32_t    pageCount() const = 0;
+    virtual DbResult<void>  close() = 0;
+    virtual DbResult<void>  readPage(PageNum page, ByteSpan dst) = 0;
+    virtual DbResult<void>  writePage(PageNum page, ByteView src) = 0;
+    virtual bool            isOpen() const = 0;
+    virtual uint32_t        pageCount() const = 0;
 };
 
 } // namespace LiliumDB

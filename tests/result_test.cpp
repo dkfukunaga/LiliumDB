@@ -112,11 +112,83 @@ TEST(ResultTest, ReturnErgonomics) {
 }
 
 TEST(ResultTest, Macros) {
-    auto r1 = Result<int, std::string>(Ok(42));
-    EXPECT_TRUE(r1);
+    auto okFn = []() -> Result<int, std::string> {
+        return Ok(42);
+    };
+
+    auto errFn = []() -> Result<int, std::string> {
+        return Err(std::string("error"));
+    };
+
+    auto fn1 = [&]() -> Result<int, std::string> {
+        RETURN_ON_ERROR(errFn());
+        return Ok(42);
+    };
+
+    auto fn2 = [&]() -> Result<int, std::string> {
+        int x;
+        ASSIGN_OR_RETURN(x, errFn());
+        return Ok(x);
+    };
+
+    auto fn3 = [&]() -> Result<int, std::string> {
+        int x;
+        ASSIGN_OR_RETURN(x, okFn());
+        return Ok(x);
+    };
+
+    EXPECT_FALSE(fn1());
+    EXPECT_EQ(fn1().error(), "error");
+    EXPECT_FALSE(fn2());
+    EXPECT_EQ(fn2().error(), "error");
+    EXPECT_TRUE(fn3());
+    EXPECT_EQ(fn3().value(), 42);
+}
+
+TEST(ResultTest, VoidSpecialization) {
+    auto okFn = []() -> Result<void, std::string> {
+        return Ok();
+    };
+
+    auto errFn = []() -> Result<void, std::string> {
+        return Err(std::string("error"));
+    };
+
+    auto propagateFn = [&]() -> Result<void, std::string> {
+        RETURN_ON_ERROR(errFn());
+        return Ok();
+    };
+
+    auto propagateOkFn = [&]() -> Result<void, std::string> {
+        RETURN_ON_ERROR(okFn());
+        return Ok();
+    };
+
+    // Observers
+    EXPECT_TRUE(okFn().isOk());
+    EXPECT_FALSE(okFn().isErr());
+    EXPECT_FALSE(errFn().isOk());
+    EXPECT_TRUE(errFn().isErr());
+
+    // Bool conversion
+    EXPECT_TRUE(static_cast<bool>(okFn()));
+    EXPECT_FALSE(static_cast<bool>(errFn()));
+
+    // Error access
+    EXPECT_EQ(errFn().error(), "error");
+
+    // Macro propagation
+    EXPECT_FALSE(propagateFn());
+    EXPECT_EQ(propagateFn().error(), "error");
+    EXPECT_TRUE(propagateOkFn());
+}
+
+TEST(ResultTest, SameType) {
+    auto r1 = Result<int, int>(Ok(42));
+    EXPECT_TRUE(r1.isOk());
     EXPECT_EQ(r1.value(), 42);
 
-    auto r2 = Result<std::string, int>(Err(404));
-    EXPECT_FALSE(r2);
+    auto r2 = Result<int, int>(Err(404));
+    EXPECT_TRUE(r2.isErr());
     EXPECT_EQ(r2.error(), 404);
 }

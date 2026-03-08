@@ -16,9 +16,9 @@ public:
     static DbResult<std::unique_ptr<PageIO>> open(std::string_view path, OpenMode mode);
     ~StdPageIO() override { if (isOpen()) (void)close(); } // errors silently discarded on destruction
 
-    VoidResult          close() override;
-    VoidResult          readPage(PageNum page, ByteSpan dst) override;
-    VoidResult          writePage(PageNum page, ByteView src) override;
+    DbResult<void>      close() override;
+    DbResult<void>      readPage(PageNum page, ByteSpan dst) override;
+    DbResult<void>      writePage(PageNum page, ByteView src) override;
 
     bool                isOpen() const override;
     uint32_t            pageCount() const override { return pageCount_; }

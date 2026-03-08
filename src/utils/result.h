@@ -85,6 +85,42 @@ private:
     std::variant<T, E> data_;
 };
 
+template <>
+struct Ok<void> {
+    Ok() = default;
+};
+Ok() -> Ok<void>;
+
+template <class E>
+class [[nodiscard]] Result<void, E> {
+public:
+    // --- Constructors ---
+
+    /// Constructs a successful Result wrapping the given value.
+    Result(Ok<void>): data_(std::in_place_index<0>) { }
+    /// Constructs a failed Result wrapping the given error.
+    Result(Err<E> error): data_(std::in_place_index<1>, std::move(error.err)) { }
+
+    // --- Observers ---
+
+    /// Returns true if the Result holds a value.
+    bool                isOk()  const noexcept { return data_.index() == 0; }
+    /// Returns true if the Result holds an error.
+    bool                isErr() const noexcept { return data_.index() == 1; }
+    /// True if the Result holds a value, false if Result holds an error.
+    explicit operator   bool()  const noexcept { return isOk(); }
+
+    // --- Accessors ---
+
+    /// Accesses the error. Asserts if the Result holds a value.
+    E&                  error() &       { assert(isErr()); return std::get<1>(data_); }
+    const E&            error() const & { assert(isErr()); return std::get<1>(data_); }
+    E&&                 error() &&      { assert(isErr()); return std::get<1>(std::move(data_)); }
+
+private:
+    std::variant<std::monostate, E> data_;
+};
+
 } // namespace LiliumDB
 
 #endif

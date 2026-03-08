@@ -5,7 +5,7 @@
 
 // --- Error propagation macros
 
-// Evaluates expr (which must return a Result<T, E>).
+// Evaluates expr (which must return a Result<T, E> or Result<void, E>).
 // On error, returns the error to the caller.
 #define RETURN_ON_ERROR(expr)                       \
     do {                                            \

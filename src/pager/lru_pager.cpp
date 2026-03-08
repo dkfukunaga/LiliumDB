@@ -26,7 +26,7 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     return Ok(std::move(pager));
 }
 
-VoidResult LRUPager::close() {
+DbResult<void> LRUPager::close() {
     for (Frame frame : frames_) {
         assert(frame.pinCount == 0);
     }
@@ -34,10 +34,10 @@ VoidResult LRUPager::close() {
     RETURN_ON_ERROR(flushAll());
     RETURN_ON_ERROR(pageIO_->close());
 
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult LRUPager::flushPage(PageNum pageNum) {
+DbResult<void> LRUPager::flushPage(PageNum pageNum) {
     if (pageNum >= appendStart_) {
         while (pageNum >= appendStart_) {
             RETURN_ON_ERROR(flush(appendStart_++));
@@ -46,10 +46,10 @@ VoidResult LRUPager::flushPage(PageNum pageNum) {
         RETURN_ON_ERROR(flush(pageNum));
     }
 
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult LRUPager::flushAll() {
+DbResult<void> LRUPager::flushAll() {
     for (PageNum i = 0; i <= highestAllocated_; ++i) {
         if (pageMap_.find(i) != pageMap_.end()) {
             RETURN_ON_ERROR(flush(i));
@@ -58,10 +58,10 @@ VoidResult LRUPager::flushAll() {
             }
         }
     }
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult LRUPager::validateFileHeader() {
+DbResult<void> LRUPager::validateFileHeader() {
     PageGuard pageGuard;
     ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
     ByteView headerView = pageGuard.subview(0, sizeof(FileHeader));
@@ -90,10 +90,10 @@ VoidResult LRUPager::validateFileHeader() {
     freespaceHead_ = headerView.get<PageNum>(offsetof(FileHeader, freespaceHead));
     appendStart_ = headerView.get<PageNum>(offsetof(FileHeader, pageCount));
 
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult LRUPager::initFile() {
+DbResult<void> LRUPager::initFile() {
     // initialize new file header
     FileHeader header;
 
@@ -119,7 +119,7 @@ VoidResult LRUPager::initFile() {
     appendStart_ = 1;
     freespaceHead_ = INVALID_PAGE;
 
-    return Ok(Success);
+    return Ok();
 }
 
 DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
@@ -142,7 +142,7 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
     return Ok(index);
 }
 
-VoidResult LRUPager::serializeFileHeader(FileHeader header) {
+DbResult<void> LRUPager::serializeFileHeader(FileHeader header) {
     PageGuard pageGuard;
     ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
     ByteSpan headerSpan = pageGuard.subspan(0, sizeof(FileHeader));
@@ -159,10 +159,10 @@ VoidResult LRUPager::serializeFileHeader(FileHeader header) {
     // skip reserved bytes
     SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
 
-    return Ok(Success);
+    return Ok();
 }
 
-VoidResult LRUPager::flush(PageNum pageNum) {
+DbResult<void> LRUPager::flush(PageNum pageNum) {
     FrameIndex frameIndex = *pageMap_[pageNum];
     Frame& frame = frames_[frameIndex];
 
@@ -171,7 +171,7 @@ VoidResult LRUPager::flush(PageNum pageNum) {
         frame.dirty = false;
     }
 
-    return Ok(Success);
+    return Ok();
 }
 
 } // namespace LiliumDB
