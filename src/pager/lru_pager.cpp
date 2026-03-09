@@ -58,6 +58,15 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     return Ok(PageGuard(this, pageNum, frame.span));
 }
 
+DbResult<PageGuard> LRUPager::newPage(PageType type) {
+
+    return Err(Status::error("Page allocation not implemented yet."));
+}
+DbResult<void> LRUPager::deletePage(PageNum pageNum) {
+
+    return Err(Status::error("Page deletion not implemented yet."));
+}
+
 DbResult<void> LRUPager::flushPage(PageNum pageNum) {
     if (pageNum >= appendStart_) {
         while (pageNum >= appendStart_) {
@@ -82,21 +91,21 @@ DbResult<void> LRUPager::flushAll() {
     return Ok();
 }
 
-void LRUPager::markDirty(PageNum pageNum) {
+void LRUPager::markDirty(PageNum pageNum) noexcept {
     assert(pageMap_.find(pageNum) != pageMap_.end());
 
     FrameIndex frameIndex = *pageMap_[pageNum];
     frames_[frameIndex].dirty = true;
 }
 
-void LRUPager::pinPage(PageNum pageNum) {
+void LRUPager::pinPage(PageNum pageNum) noexcept {
     assert(pageMap_.find(pageNum) != pageMap_.end());
 
     FrameIndex frameIndex = *pageMap_[pageNum];
     frames_[frameIndex].pinCount++;
 }
 
-void LRUPager::unpinPage(PageNum pageNum) {
+void LRUPager::unpinPage(PageNum pageNum) noexcept {
     assert(pageMap_.find(pageNum) != pageMap_.end());
 
     FrameIndex frameIndex = *pageMap_[pageNum];
@@ -182,6 +191,12 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
     }
 
     return Ok(index);
+}
+
+DbResult<LRUPager::FrameIndex> LRUPager::evictLastUsedPage() {
+
+
+    return Err(Status::error("Eviction not implemented yet."));
 }
 
 DbResult<void> LRUPager::serializeFileHeader(FileHeader header) {
