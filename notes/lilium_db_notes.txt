@@ -198,6 +198,12 @@ else freeList_.pop() → free frame index
 
 // on page eviction:
 scan lruList_ from back → find first frame where pinCount == 0
+→ if none found → return Status::bufferFull(...)
+→ flush if dirty
+→ remove from pageMap_
+→ remove from lruList_
+→ return frame index
+
 → if none found → return Status::BufferFull
 → write back if dirty
 → remove from pageTable_ (old pageNum)
