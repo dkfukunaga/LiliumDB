@@ -21,6 +21,7 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     } else {
         RETURN_ON_ERROR(lruPager->validateFileHeader());
     }
+    lruPager->highestAllocated_ = lruPager->appendStart_ - 1;
 
     std::unique_ptr<Pager> pager = std::move(lruPager);
     return Ok(std::move(pager));
@@ -35,6 +36,26 @@ DbResult<void> LRUPager::close() {
     RETURN_ON_ERROR(pageIO_->close());
 
     return Ok();
+}
+
+DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
+    if (pageNum > highestAllocated_) {
+        return Err(Status::fileErr("Page out of range."));
+    }
+    auto mapIter = pageMap_.find(pageNum);
+    if (mapIter != pageMap_.end()) {
+        auto frameIter = mapIter->second;
+        lruList_.splice(lruList_.begin(), lruList_, frameIter);
+        Frame& frame = frames_[*frameIter];
+
+        return Ok(PageGuard(this, pageNum, frame.span));
+    }
+    FrameIndex frameIndex;
+    ASSIGN_OR_RETURN(frameIndex, allocateFrame(pageNum));
+    Frame& frame = frames_[frameIndex];
+    RETURN_ON_ERROR(pageIO_->readPage(pageNum, frame.span));
+
+    return Ok(PageGuard(this, pageNum, frame.span));
 }
 
 DbResult<void> LRUPager::flushPage(PageNum pageNum) {
@@ -59,6 +80,28 @@ DbResult<void> LRUPager::flushAll() {
         }
     }
     return Ok();
+}
+
+void LRUPager::markDirty(PageNum pageNum) {
+    assert(pageMap_.find(pageNum) != pageMap_.end());
+
+    FrameIndex frameIndex = *pageMap_[pageNum];
+    frames_[frameIndex].dirty = true;
+}
+
+void LRUPager::pinPage(PageNum pageNum) {
+    assert(pageMap_.find(pageNum) != pageMap_.end());
+
+    FrameIndex frameIndex = *pageMap_[pageNum];
+    frames_[frameIndex].pinCount++;
+}
+
+void LRUPager::unpinPage(PageNum pageNum) {
+    assert(pageMap_.find(pageNum) != pageMap_.end());
+
+    FrameIndex frameIndex = *pageMap_[pageNum];
+    assert(frames_[frameIndex].pinCount > 0);
+    frames_[frameIndex].pinCount--;
 }
 
 DbResult<void> LRUPager::validateFileHeader() {
@@ -110,7 +153,7 @@ DbResult<void> LRUPager::initFile() {
     header.checksum = CHECKSUM_PLACEHOLDER;
 
     // allocate new page zero
-    RETURN_ON_ERROR(allocatePage(0));
+    RETURN_ON_ERROR(allocateFrame(0));
 
     // write file header to page zero
     RETURN_ON_ERROR(serializeFileHeader(header));
@@ -122,21 +165,20 @@ DbResult<void> LRUPager::initFile() {
     return Ok();
 }
 
-DbResult<LRUPager::FrameIndex> LRUPager::allocatePage(PageNum pageNum) {
+DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
     FrameIndex index;
     if (nextFreeFrame_ < frames_.size()) {
         index = nextFreeFrame_++;
     } else {
         ASSIGN_OR_RETURN(index, evictLastUsedPage());
     }
-    Frame frame(pool_, index, pageNum);
 
-    frames_[index] = frame;
+    frames_[index] = Frame(pool_, index, pageNum);
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
     if (pageNum > highestAllocated_) {
-        ++highestAllocated_;
+        highestAllocated_ = pageNum;
     }
 
     return Ok(index);
@@ -167,7 +209,7 @@ DbResult<void> LRUPager::flush(PageNum pageNum) {
     Frame& frame = frames_[frameIndex];
 
     if (frame.dirty) {
-        RETURN_ON_ERROR(pageIO_->writePage(pageNum, frame.data));
+        RETURN_ON_ERROR(pageIO_->writePage(pageNum, frame.span));
         frame.dirty = false;
     }
 
