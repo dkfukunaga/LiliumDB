@@ -46,21 +46,21 @@ private:
     using FrameIter = std::list<FrameIndex>::iterator;
 
     struct Frame {
-        ByteSpan    data;                       // points into pool_ at frame offset
+        ByteSpan    span;                       // points into pool_ at frame offset
         PageNum     pageNum  = INVALID_PAGE;    // which page is loaded, INVALID_PAGE if empty
         uint32_t    pinCount = 0;               // count of PageGuards accessing page
         bool        dirty    = false;           // flush on eviction if dirty
 
         Frame() = default;
         Frame(std::vector<uint8_t>& dat, FrameIndex idx, PageNum pn)
-            : data(ByteSpan(&dat.data()[idx * PAGE_SIZE], PAGE_SIZE))
+            : span(ByteSpan(&dat.data()[idx * PAGE_SIZE], PAGE_SIZE))
             , pageNum(pn) { }
     };
 
     std::unique_ptr<PageIO> pageIO_;
     PageNum                 freespaceHead_;
     PageNum                 appendStart_;
-    PageNum                 highestAllocated_ = 0;
+    PageNum                 highestAllocated_;
     FrameIndex              nextFreeFrame_ = 0;
 
     // Buffer pool of poolSize * PAGE_SIZE bytes
@@ -82,7 +82,7 @@ private:
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();
     DbResult<void>          initPage(PageNum pageNum, PageType type);
-    DbResult<FrameIndex>    allocatePage(PageNum pageNum);
+    DbResult<FrameIndex>    allocateFrame(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     DbResult<void>          serializeFileHeader(FileHeader header);
     DbResult<void>          flush(PageNum pageNum);
