@@ -27,3 +27,7 @@ gtest_discover_tests(result_test)
 add_executable(flags_test flags_test.cpp)
 target_link_libraries(flags_test PRIVATE liliumdb_lib GTest::gtest_main)
 gtest_discover_tests(flags_test)
+
+add_executable(lru_pager_test lru_pager_test.cpp)
+target_link_libraries(lru_pager_test PRIVATE liliumdb_lib GTest::gtest_main)
+gtest_discover_tests(lru_pager_test)
