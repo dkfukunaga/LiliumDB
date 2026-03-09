@@ -40,15 +40,6 @@ inline constexpr PageOffset PAGE_ZERO_HEADER_OFFSET = FILE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_START = FILE_HEADER_SIZE + PAGE_HEADER_SIZE;
 inline constexpr PageOffset PAGE_ZERO_DATA_END = PAGE_SIZE - PAGE_FOOTER_SIZE;
 
-enum class PageType : uint8_t {
-    Invalid     = 0,    // invalid/unitialized
-    Table       = 1,    // table page
-    Index       = 2,    // index page
-    Expansion   = 3,    // overflow (future)
-    FreeList    = 4,    // free list
-    FreeSpace   = 5,    // Freespace map (future)
-};
-
 enum class FileFlag : uint16_t {
     None     = 0x00,
     ReadOnly = 0x01,
@@ -71,6 +62,15 @@ struct FileHeader {
 };
 
 static_assert(sizeof(FileHeader) == FILE_HEADER_SIZE);
+
+enum class PageType : uint8_t {
+    Invalid     = 0,    // invalid/unitialized
+    Table       = 1,    // table page
+    Index       = 2,    // index page
+    Expansion   = 3,    // overflow (future)
+    FreeList    = 4,    // free list
+    FreeSpace   = 5,    // Freespace map (future)
+};
 
 enum class PageFlag : uint8_t {
     None     = 0x00,
