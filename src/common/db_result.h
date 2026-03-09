@@ -2,9 +2,8 @@
 #define LILIUMDB_DB_RESULT_H
 
 #include "utils/result.h"
+#include "utils/result_macros.h"
 #include "status.h"
-
-#include <variant>      // std::monostate
 
 namespace LiliumDB {
 

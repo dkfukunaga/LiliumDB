@@ -3,6 +3,5 @@
 
 #include "types.h"
 #include "db_result.h"
-#include "utils/result_macros.h"
 
 #endif
