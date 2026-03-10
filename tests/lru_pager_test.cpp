@@ -23,96 +23,154 @@ protected:
 };
 
 TEST_F(LRUPagerTest, OpenClose) {
-    {
-        auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    ASSERT_TRUE(result.isOk());
+    pager = std::move(result.value());
+    ASSERT_TRUE(pager->isOpen());
+
+    // close Pager
+    ASSERT_TRUE(pager->close());
+}
+
+TEST_F(LRUPagerTest, NewPagefetchPage) {
+    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    ASSERT_TRUE(result.isOk());
+    pager = std::move(result.value());
+    ASSERT_TRUE(pager->isOpen());
+
+    // append an Table page (should be page 1)
+    auto r2 = pager->newPage(PageType::Table);
+    ASSERT_TRUE(r2);
+    auto page = std::move(r2.value());
+    ASSERT_EQ(page.pageNum(), 1);
+    ASSERT_EQ(page.pageType(), PageType::Table);
+
+    // append an Index page (should be page 2)
+    r2 = pager->newPage(PageType::Index);
+    ASSERT_TRUE(r2);
+    page = std::move(r2.value());
+    ASSERT_EQ(page.pageNum(), 2);
+    ASSERT_EQ(page.pageType(), PageType::Index);
+
+    // append 4 Table pages
+    for (int i = 0; i < 4; ++i) {
+        auto result = pager->newPage(PageType::Table);
         ASSERT_TRUE(result.isOk());
-        pager = std::move(result.value());
-        ASSERT_TRUE(pager->isOpen());
+        auto page = std::move(result.value());
+        ASSERT_EQ(page.pageNum(), 3 + i);
+        ASSERT_EQ(page.pageType(), PageType::Table);
+    }
+
+    // close file
+    page.reset();
+    ASSERT_TRUE(pager->close());
+
+    // reopen file
+    {
+        auto r1 = LRUPager::open(path, OpenMode::ReadOnly);
+        ASSERT_TRUE(r1.isOk());
+        auto readPager = std::move(r1.value());
+        ASSERT_TRUE(readPager->isOpen());
+
+        // check page 0
+        r2 = readPager->fetchPage(0);
+        ASSERT_TRUE(r2);
+        auto readPage = std::move(r2.value());
+        ASSERT_EQ(readPage.pageNum(), 0);
+        ASSERT_EQ(readPage.pageType(), PageType::Table);
+
+        // check page 1
+        r2 = readPager->fetchPage(1);
+        ASSERT_TRUE(r2);
+        readPage = std::move(r2.value());
+        ASSERT_EQ(readPage.pageNum(), 1);
+        ASSERT_EQ(readPage.pageType(), PageType::Table);
+
+        // check page 2
+        r2 = readPager->fetchPage(2);
+        ASSERT_TRUE(r2);
+        readPage = std::move(r2.value());
+        ASSERT_EQ(readPage.pageNum(), 2);
+        ASSERT_EQ(readPage.pageType(), PageType::Index);
+
+        // check page 6
+        r2 = readPager->fetchPage(6);
+        ASSERT_TRUE(r2);
+        readPage = std::move(r2.value());
+        ASSERT_EQ(readPage.pageNum(), 6);
+        ASSERT_EQ(readPage.pageType(), PageType::Table);
     }
     // pager goes out of scope and should close without error
 }
 
-TEST_F(LRUPagerTest, NewPagefetchPage) {
-    {
-        auto result = LRUPager::open(path, OpenMode::ReadWrite);
+TEST_F(LRUPagerTest, DeletePage) {
+    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    ASSERT_TRUE(result.isOk());
+    pager = std::move(result.value());
+    ASSERT_TRUE(pager->isOpen());
+
+    // append 3 Table pages (pages 1-3)
+    for (int i = 0; i < 3; ++i) {
+        auto result = pager->newPage(PageType::Table);
         ASSERT_TRUE(result.isOk());
-        pager = std::move(result.value());
-        ASSERT_TRUE(pager->isOpen());
-
-        // append an Table page (should be page 1)
-        {
-            auto result = pager->newPage(PageType::Table);
-            ASSERT_TRUE(result.isOk());
-            auto page = std::move(result.value());
-            ASSERT_EQ(page.pageNum(), 1);
-            ASSERT_EQ(page.pageType(), PageType::Table);
-        }
-
-        // append an Index page (should be page 2)
-        {
-            auto result = pager->newPage(PageType::Index);
-            ASSERT_TRUE(result.isOk());
-            auto page = std::move(result.value());
-            ASSERT_EQ(page.pageNum(), 2);
-            ASSERT_EQ(page.pageType(), PageType::Index);
-        }
-
-        // append 4 Table pages
-        for (int i = 0; i < 4; ++i) {
-            auto result = pager->newPage(PageType::Table);
-            ASSERT_TRUE(result.isOk());
-            auto page = std::move(result.value());
-            ASSERT_EQ(page.pageNum(), 3 + i);
-            ASSERT_EQ(page.pageType(), PageType::Table);
-        }
-
-        // close file
-        ASSERT_TRUE(pager->close());
-
-        // reopen file
-        result = LRUPager::open(path, OpenMode::ReadOnly);
-        ASSERT_TRUE(result.isOk());
-        pager = std::move(result.value());
-        ASSERT_TRUE(pager->isOpen());
-
-        // check page 0
-        {
-            auto r = pager->fetchPage(0);
-            ASSERT_TRUE(r.isOk());
-            auto p = std::move(r.value());
-            ASSERT_EQ(p.pageNum(), 0);
-            ASSERT_EQ(p.pageType(), PageType::Table);
-        }
-
-        // check page 1
-        {
-            auto r = pager->fetchPage(1);
-            ASSERT_TRUE(r.isOk());
-            auto p = std::move(r.value());
-            ASSERT_EQ(p.pageNum(), 1);
-            ASSERT_EQ(p.pageType(), PageType::Table);
-        }
-
-        // check page 2
-        {
-            auto r = pager->fetchPage(2);
-            ASSERT_TRUE(r.isOk());
-            auto p = std::move(r.value());
-            ASSERT_EQ(p.pageNum(), 2);
-            ASSERT_EQ(p.pageType(), PageType::Index);
-        }
-
-        // check page 6
-        {
-            auto r = pager->fetchPage(6);
-            ASSERT_TRUE(r.isOk());
-            auto p = std::move(r.value());
-            ASSERT_EQ(p.pageNum(), 6);
-            ASSERT_EQ(p.pageType(), PageType::Table);
-        }
-
-        // close file
-        ASSERT_TRUE(pager->close());
+        auto page = std::move(result.value());
+        ASSERT_EQ(page.pageNum(), 1 + i);
+        ASSERT_EQ(page.pageType(), PageType::Table);
     }
+
+    // delete page 2
+    ASSERT_TRUE(pager->deletePage(2));
+
+    // check type of page 2
+    auto pageResult = pager->fetchPage(2);
+    ASSERT_TRUE(pageResult);
+    auto page = std::move(pageResult.value());
+    ByteView view = page.subview(0, PAGE_HEADER_SIZE);
+    PageType pageType = view.get<PageType>(offsetof(PageHeader, pageType));
+    ASSERT_EQ(pageType, PageType::FreeList);
+
+    // append another page (should reuse page 2)
+    pageResult = pager->newPage(PageType::Index);
+    ASSERT_TRUE(pageResult);
+    page = std::move(pageResult.value());
+    ASSERT_EQ(page.pageNum(), 2);
+    ASSERT_EQ(page.pageType(), PageType::Index);
+
+    // append another page (should be page 4)
+    pageResult = pager->newPage(PageType::Table);
+    ASSERT_TRUE(pageResult);
+    page = std::move(pageResult.value());
+    ASSERT_EQ(page.pageNum(), 4);
+    ASSERT_EQ(page.pageType(), PageType::Table);
+
+    // delete page 4 for manual inspection
+    // should return InvalidArg error if PageGuard is still in scope
+    auto errResult = pager->deletePage(4);
+    ASSERT_FALSE(errResult);
+    ASSERT_EQ(errResult.error().code(), Status::Code::InvalidArg);
+
+    // reset PageGuard and then delete
+    page.reset();
+    ASSERT_TRUE(pager->deletePage(4));
+
+    // close pager
+    page.reset();
+    ASSERT_TRUE(pager->close());
+
+    // reopen pager to inspect FileHeader
+    result = LRUPager::open(path, OpenMode::ReadWrite);
+    ASSERT_TRUE(result.isOk());
+    pager = std::move(result.value());
+    ASSERT_TRUE(pager->isOpen());
+
+    // check freespaceHead in file header
+    pageResult = pager->fetchPage(0);
+    ASSERT_TRUE(pageResult);
+    page = std::move(pageResult.value());
+    view = page.subview(0, FILE_HEADER_SIZE);
+    PageNum freespaceHead = view.get<PageNum>(offsetof(FileHeader, freespaceHead));
+    ASSERT_EQ(freespaceHead, 4);
+
+    // page goes out of scope and should unpin page
     // pager goes out of scope and should close without error
 }
