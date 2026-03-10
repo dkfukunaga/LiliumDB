@@ -27,12 +27,14 @@ public:
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
 
     // Writes sizeof(T) bytes of value at start. Throws if out of range.
-    template <typename T> void          put(size_t start, const T value);
+    template <class T> void             put(size_t start, const T& value);
     // Copies len bytes from src into this span starting at start.
     void                                write(size_t start, const uint8_t* src, size_t len);
     // Copies len bytes within this span from [from, from+len) to [to, to+len).
     // Safe for overlapping regions.
     void                                copy_within(size_t to, size_t from, size_t len);
+    void                                set(const uint8_t& value) { memset(data_, value, size_); }
+    void                                clear() { set(0); }
 
     constexpr uint8_t*                  data() noexcept { return data_; }
     constexpr const uint8_t*            data() const noexcept { return data_; }
@@ -81,7 +83,7 @@ public:
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
 
     // Reads sizeof(T) bytes at start from this view and returns as T. Throws if out of range.
-    template <typename T> T             get(size_t start) const;
+    template <class T> T                get(size_t start) const;
     // Copies len bytes from this view into dst starting at start.
     void                                read(size_t start, uint8_t* dst, size_t len) const;
 
@@ -131,8 +133,8 @@ constexpr ByteView ByteSpan::subview(size_t start, size_t len) const {
         throw std::out_of_range("subview out of range");
 }
 
-template <typename T>
-inline void ByteSpan::put(size_t start, const T value) {
+template <class T>
+inline void ByteSpan::put(size_t start, const T& value) {
     if (start <= size_ && sizeof(T) <= size_ - start)
         std::memcpy(data_ + start, &value, sizeof(T));
     else
@@ -169,7 +171,7 @@ constexpr ByteView ByteView::subview(size_t start, size_t len) const {
         throw std::out_of_range("subview out of range");
 }
 
-template <typename T>
+template <class T>
 inline T ByteView::get(size_t start) const {
     T value;
     if (start <= size_ && sizeof(T) <= size_ - start)
