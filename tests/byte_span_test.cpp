@@ -67,6 +67,21 @@ TEST(ByteSpanTest, Iterators) {
     EXPECT_EQ(reverse_collected, std::vector<uint8_t>({30, 20, 10}));
 }
 
+TEST(ByteSpanTest, SetAndClear) {
+    std::vector<uint8_t> data = {10, 10, 10, 10};
+    ByteSpan span(data.data(), data.size());
+
+    std::vector<uint8_t> zero(4);
+    span.clear();
+    std::vector<uint8_t> collected(span.begin(), span.end());
+    EXPECT_EQ(collected, zero);
+
+    std::vector<uint8_t> sixseven = {67, 67, 67, 67};
+    span.set(67);
+    collected = std::vector<uint8_t>(span.begin(), span.end());
+    EXPECT_EQ(collected, sixseven);
+}
+
 TEST(ByteViewTest, Basic) {
     std::vector<uint8_t> data = {5, 10, 15, 20};
     ByteSpan span(data.data(), data.size());

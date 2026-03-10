@@ -17,6 +17,8 @@ public:
         IOErr,
         FileInvalid,
         Corrupt,
+        InvalidArg,
+        BufferFull,
         Error
     };
 
@@ -25,6 +27,8 @@ public:
     static Status       ioErr(std::string_view msg) { return Status(Code::IOErr, std::string(msg)); }
     static Status       fileInvalid(std::string_view msg) { return Status(Code::FileInvalid, std::string(msg)); }
     static Status       corrupt(std::string_view msg) { return Status(Code::Corrupt, std::string(msg)); }
+    static Status       invalidArg(std::string_view msg) { return Status(Code::InvalidArg, std::string(msg)); }
+    static Status       bufferFull(std::string_view msg) { return Status(Code::BufferFull, std::string(msg)); }
     static Status       error(std::string_view msg) { return Status(Code::Error, std::string(msg)); }
 
     Code                code() const noexcept { return code_; }

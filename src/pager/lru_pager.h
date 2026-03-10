@@ -46,18 +46,21 @@ private:
     using FrameIter = std::list<FrameIndex>::iterator;
 
     struct Frame {
-        ByteSpan    span;                       // points into pool_ at frame offset
-        PageNum     pageNum  = INVALID_PAGE;    // which page is loaded, INVALID_PAGE if empty
-        uint32_t    pinCount = 0;               // count of PageGuards accessing page
-        bool        dirty    = false;           // flush on eviction if dirty
+        ByteSpan    span;                           // points into pool_ at frame offset
+        PageNum     pageNum  = INVALID_PAGE;        // which page is loaded, INVALID_PAGE if empty
+        PageType    pageType = PageType::Invalid;   // Invalid if empty or uninitialized
+        uint32_t    pinCount = 0;                   // count of PageGuards accessing page
+        bool        dirty    = false;               // flush on eviction if dirty
 
         Frame() = default;
-        Frame(std::vector<uint8_t>& dat, FrameIndex idx, PageNum pn)
+        Frame(std::vector<uint8_t>& dat, FrameIndex idx, PageNum pn, PageType pt)
             : span(ByteSpan(&dat.data()[idx * PAGE_SIZE], PAGE_SIZE))
-            , pageNum(pn) { }
+            , pageNum(pn)
+            , pageType(pt) { }
     };
 
     std::unique_ptr<PageIO> pageIO_;
+    OpenMode                openMode_;
     PageNum                 freespaceHead_;
     PageNum                 appendStart_;
     PageNum                 highestAllocated_;
@@ -74,14 +77,15 @@ private:
     // Map page number to lruList_ iterator
     std::unordered_map<PageNum, FrameIter> pageMap_;
 
-    LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
+    LRUPager(std::unique_ptr<PageIO> pageIO, OpenMode mode, size_t poolSize)
         : pageIO_(std::move(pageIO))
+        , openMode_(mode)
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
 
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();
-    DbResult<PageGuard>     initPage(PageGuard page, PageType type);
+    DbResult<PageGuard>     initPage(PageGuard&& page, PageType pageType);
     DbResult<FrameIndex>    allocateFrame(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     DbResult<void>          flush(PageNum pageNum);
