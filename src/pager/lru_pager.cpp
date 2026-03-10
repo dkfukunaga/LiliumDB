@@ -301,9 +301,28 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
 }
 
 DbResult<LRUPager::FrameIndex> LRUPager::evictLastUsedPage() {
+    auto iter = lruList_.end();
 
+    while (iter != lruList_.begin()) {
+        --iter;
+        if (frames_[*iter].pinCount == 0) {
+            break;
+        }
+    }
+    if (iter == lruList_.begin() && frames_[*iter].pinCount != 0) {
+        return Err(Status::bufferFull("Buffer pool is in use."));
+    }
 
-    return Err(Status::error("Eviction not implemented yet."));
+    Frame& frame = frames_[*iter];
+    if (frame.dirty == true) {
+        RETURN_ON_ERROR(flush(frame.pageNum));
+    }
+
+    FrameIndex index = *iter;
+    pageMap_.erase(frame.pageNum);
+    lruList_.erase(iter);
+
+    return Ok(index);
 }
 
 DbResult<void> LRUPager::flush(PageNum pageNum) {
