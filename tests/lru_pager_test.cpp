@@ -234,7 +234,7 @@ TEST_F(LRUPagerTest, PageEviction) {
         // write byte pattern
         ByteSpan span = page.span();
 
-        for (int j = 0; j < i; ++j) {
+        for (int j = 0; j < 10 + i; ++j) {
             span.put<int>(offset, sixseven);
             offset += sizeof(sixseven);
         }
@@ -274,7 +274,7 @@ TEST_F(LRUPagerTest, PageEviction) {
         ByteView view = page.span();
         PageOffset offset = PAGE_HEADER_SIZE;
 
-        for (int j = 0; j < i; ++j) {
+        for (int j = 0; j < 10 + i; ++j) {
             data = view.get<int>(offset);
             ASSERT_EQ(data, sixseven);
             offset += sizeof(data);
