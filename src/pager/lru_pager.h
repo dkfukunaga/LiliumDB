@@ -84,7 +84,7 @@ private:
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();
     DbResult<PageGuard>     initPage(PageNum pageNum, PageType pageType);
-    DbResult<FrameIndex>    allocateFrame(PageNum pageNum, PageType pageType = PageType::Invalid);
+    DbResult<FrameIndex>    allocateFrame(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     DbResult<void>          flush(PageNum pageNum);
     DbResult<void>          updateFileHeader();

@@ -259,7 +259,7 @@ DbResult<PageGuard> LRUPager::initPage(PageNum pageNum, PageType pageType) {
     return Ok(std::move(page));
 }
 
-DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum, PageType pageType) {
+DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
     FrameIndex index;
     if (nextFreeFrame_ < frames_.size()) {
         index = nextFreeFrame_++;
@@ -267,7 +267,7 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum, PageType
         ASSIGN_OR_RETURN(index, evictLastUsedPage());
     }
 
-    frames_[index] = Frame(pool_, index, pageNum, pageType);
+    frames_[index] = Frame(pool_, index, pageNum, PageType::Invalid);
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
