@@ -39,25 +39,40 @@ TEST_F(LRUPagerTest, NewPage) {
         pager = std::move(result.value());
         ASSERT_TRUE(pager->isOpen());
 
-        // append a Table page
+        // append a Table page (should be on page 0)
         {
             auto result = pager->newPage(PageType::Table);
             ASSERT_TRUE(result.isOk());
             auto page = std::move(result.value());
+            ASSERT_EQ(page.pageNum(), 0);
+            ASSERT_EQ(page.pageType(), PageType::Table);
         }
 
-        // append an Index page
+        // append an Index page (should be page 1)
         {
             auto result = pager->newPage(PageType::Index);
             ASSERT_TRUE(result.isOk());
             auto page = std::move(result.value());
+            ASSERT_EQ(page.pageNum(), 1);
+            ASSERT_EQ(page.pageType(), PageType::Index);
         }
 
-        // append 5 Table pages
-        for (int i = 0; i < 5; ++i) {
+        // append a FreeList page (should be page 2)
+        {
+            auto result = pager->newPage(PageType::FreeList);
+            ASSERT_TRUE(result.isOk());
+            auto page = std::move(result.value());
+            ASSERT_EQ(page.pageNum(), 2);
+            ASSERT_EQ(page.pageType(), PageType::FreeList);
+        }
+
+        // append 4 Table pages
+        for (int i = 0; i < 4; ++i) {
             auto result = pager->newPage(PageType::Table);
             ASSERT_TRUE(result.isOk());
             auto page = std::move(result.value());
+            ASSERT_EQ(page.pageNum(), 3 + i);
+            ASSERT_EQ(page.pageType(), PageType::Table);
         }
     }
     // pager goes out of scope and should close without error
