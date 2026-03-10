@@ -46,9 +46,9 @@ private:
     using FrameIter = std::list<FrameIndex>::iterator;
 
     struct Frame {
+        ByteSpan    span;                           // points into pool_ at frame offset
         PageNum     pageNum  = INVALID_PAGE;        // which page is loaded, INVALID_PAGE if empty
         PageType    pageType = PageType::Invalid;   // Invalid if empty or uninitialized
-        ByteSpan    span;                           // points into pool_ at frame offset
         uint32_t    pinCount = 0;                   // count of PageGuards accessing page
         bool        dirty    = false;               // flush on eviction if dirty
 
@@ -85,7 +85,7 @@ private:
 
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();
-    DbResult<PageGuard>     initPage(PageNum pageNum, PageType pageType);
+    DbResult<PageGuard>     initPage(PageGuard&& page, PageType pageType);
     DbResult<FrameIndex>    allocateFrame(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
     DbResult<void>          flush(PageNum pageNum);
