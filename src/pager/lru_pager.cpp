@@ -101,6 +101,12 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
         return Err(Status::invalidArg("Cannot delete page 0."));
     }
 
+    // check if page is pinned
+    Frame& frame = frames_[*pageMap_[pageNum]];
+    if (frame.pinCount > 0) {
+        return Err(Status::invalidArg("Page " + std::to_string(pageNum) + " is pinned."));
+    }
+
     // get page to be deleted
     PageGuard page;
     ASSIGN_OR_RETURN(page, fetchPage(pageNum));
@@ -117,7 +123,6 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     span.put<PageNum>(offsetof(PageHeader, next), nextFree);
 
     // update frame
-    Frame& frame = frames_[*pageMap_[pageNum]];
     frame.pageType = PageType::FreeList;
 
     return Ok();
