@@ -60,6 +60,7 @@ private:
     };
 
     std::unique_ptr<PageIO> pageIO_;
+    OpenMode                openMode_;
     PageNum                 freespaceHead_;
     PageNum                 appendStart_;
     PageNum                 highestAllocated_;
@@ -76,8 +77,9 @@ private:
     // Map page number to lruList_ iterator
     std::unordered_map<PageNum, FrameIter> pageMap_;
 
-    LRUPager(std::unique_ptr<PageIO> pageIO, size_t poolSize)
+    LRUPager(std::unique_ptr<PageIO> pageIO, OpenMode mode, size_t poolSize)
         : pageIO_(std::move(pageIO))
+        , openMode_(mode)
         , pool_(poolSize * PAGE_SIZE)
         , frames_(poolSize) { }
 

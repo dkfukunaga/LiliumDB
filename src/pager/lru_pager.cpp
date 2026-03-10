@@ -14,7 +14,7 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     std::unique_ptr<PageIO> pio;
     ASSIGN_OR_RETURN(pio, StdPageIO::open(path, mode));
 
-    std::unique_ptr<LRUPager> lruPager(new LRUPager(std::move(pio), poolSize));
+    std::unique_ptr<LRUPager> lruPager(new LRUPager(std::move(pio), mode, poolSize));
 
     if (lruPager->pageIO_->pageCount() == 0) { // new uninitialized file
         RETURN_ON_ERROR(lruPager->initFile());
@@ -31,8 +31,11 @@ DbResult<void> LRUPager::close() {
         assert(frame.pinCount == 0);
     }
 
-    RETURN_ON_ERROR(updateFileHeader());
-    RETURN_ON_ERROR(flushAll());
+    if (openMode_ != OpenMode::ReadOnly) {
+        RETURN_ON_ERROR(updateFileHeader());
+        RETURN_ON_ERROR(flushAll());
+    }
+
     RETURN_ON_ERROR(pageIO_->close());
 
     return Ok();
@@ -281,6 +284,10 @@ DbResult<LRUPager::FrameIndex> LRUPager::evictLastUsedPage() {
 }
 
 DbResult<void> LRUPager::flush(PageNum pageNum) {
+    if (openMode_ == OpenMode::ReadOnly) {
+        return Err(Status::fileErr("File is read-only."));
+    }
+
     FrameIndex frameIndex = *pageMap_[pageNum];
     Frame& frame = frames_[frameIndex];
 
