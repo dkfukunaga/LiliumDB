@@ -24,21 +24,11 @@ inline constexpr uint16_t PAGE_SIZE = 4096;
 
 // header sizes
 inline constexpr uint16_t FILE_HEADER_SIZE = 64;
-inline constexpr uint16_t PAGE_HEADER_SIZE = 16;
-inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
+inline constexpr uint16_t PAGE_HEADER_SIZE = 20;
 
-// page offsets and usable size
-inline constexpr uint16_t PAGE_OVERHEAD = PAGE_HEADER_SIZE + PAGE_FOOTER_SIZE;
-inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_OVERHEAD;
-inline constexpr uint16_t PAGE_DATA_START = PAGE_HEADER_SIZE;
-inline constexpr uint16_t PAGE_DATA_END   = PAGE_SIZE - PAGE_FOOTER_SIZE;
-
-// page 0 offsets and usable size
-inline constexpr PageOffset PAGE_ZERO_OVERHEAD = FILE_HEADER_SIZE + PAGE_OVERHEAD;
-inline constexpr PageOffset PAGE_ZERO_USABLE_SIZE = PAGE_SIZE - PAGE_ZERO_OVERHEAD;
-inline constexpr PageOffset PAGE_ZERO_HEADER_OFFSET = FILE_HEADER_SIZE;
-inline constexpr PageOffset PAGE_ZERO_DATA_START = FILE_HEADER_SIZE + PAGE_HEADER_SIZE;
-inline constexpr PageOffset PAGE_ZERO_DATA_END = PAGE_SIZE - PAGE_FOOTER_SIZE;
+// page usable size
+inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_HEADER_SIZE;
+inline constexpr uint16_t PAGE_ZERO_USABLE_SIZE = PAGE_SIZE - FILE_HEADER_SIZE - PAGE_HEADER_SIZE;
 
 enum class FileFlag : uint16_t {
     None     = 0x00,
@@ -77,10 +67,12 @@ enum class PageFlag : uint8_t {
     Corrupt  = 0x01,
 };
 
+inline constexpr uint8_t INVALID_PAGE_LEVEL = std::numeric_limits<uint8_t>::max();
+
 using PageFlags = Flags<PageFlag>;
 
 struct PageHeader {
-    PageType    type;
+    PageType    pageType;
     PageFlags   pageFlags;
     uint8_t     level;          // for B+ tree - 0 indicates leaf page
     uint8_t     reserved;       // reserved for fragmentCount in RecordStore (future)
@@ -88,15 +80,10 @@ struct PageHeader {
     uint16_t    freeOffset;     // used by RecordStore
     PageNum     next;           // right child for B+ tree branch pages
     PageNum     prev;
-};
-
-static_assert(sizeof(PageHeader) == PAGE_HEADER_SIZE);
-
-struct PageFooter {
     uint32_t    checksum;       // reserved; will implement later
 };
 
-static_assert(sizeof(PageFooter) == PAGE_FOOTER_SIZE);
+static_assert(sizeof(PageHeader) == PAGE_HEADER_SIZE);
 
 } // namespace LiliumDB
 
