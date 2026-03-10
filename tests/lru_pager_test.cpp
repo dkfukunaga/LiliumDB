@@ -186,6 +186,10 @@ TEST_F(LRUPagerTest, PageEviction) {
     ASSERT_TRUE(result);
     auto pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
+    
+    // byte patterns for testing
+    uint64_t garbage = 0xEFCDAB8967452301;
+    int sixseven = 0x6767;
 
     // write garbage to page 0
     {
@@ -200,9 +204,9 @@ TEST_F(LRUPagerTest, PageEviction) {
         auto offset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
 
         // write byte pattern
-        uint64_t garbage = 0xEFCDAB8967452301;
         ByteSpan span = page.span();
         span.put<uint64_t>(offset, garbage);
+        offset += sizeof(garbage);
 
         // set freeOffset
         span.put<PageOffset>(FILE_HEADER_SIZE + offsetof(PageHeader, freeOffset), offset);
@@ -218,8 +222,6 @@ TEST_F(LRUPagerTest, PageEviction) {
     }
 
     // append 9 Table pages with a known byte pattern for verification
-    int sixseven = 0x6767;
-
     for (int i = 2; i < 11; ++i) {
         auto r = pager->newPage(PageType::Table);
         ASSERT_TRUE(r);
@@ -251,6 +253,12 @@ TEST_F(LRUPagerTest, PageEviction) {
         auto page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 0);
         ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // check garbage bytes
+        ByteView view = page.subview(FILE_HEADER_SIZE, PAGE_ZERO_USABLE_SIZE);
+        PageOffset offset = PAGE_HEADER_SIZE;
+        uint64_t bytes = view.get<uint64_t>(offset);
+        ASSERT_EQ(bytes, garbage);
 
         // check page 1 (Index page)
         pageResult = pager->fetchPage(1);
