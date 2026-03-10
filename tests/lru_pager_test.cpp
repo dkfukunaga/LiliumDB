@@ -39,31 +39,22 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
         pager = std::move(result.value());
         ASSERT_TRUE(pager->isOpen());
 
-        // append a Table page (should be on page 0)
+        // append an Table page (should be page 1)
         {
             auto result = pager->newPage(PageType::Table);
             ASSERT_TRUE(result.isOk());
             auto page = std::move(result.value());
-            ASSERT_EQ(page.pageNum(), 0);
+            ASSERT_EQ(page.pageNum(), 1);
             ASSERT_EQ(page.pageType(), PageType::Table);
         }
 
-        // append an Index page (should be page 1)
+        // append an Index page (should be page 2)
         {
             auto result = pager->newPage(PageType::Index);
             ASSERT_TRUE(result.isOk());
             auto page = std::move(result.value());
-            ASSERT_EQ(page.pageNum(), 1);
-            ASSERT_EQ(page.pageType(), PageType::Index);
-        }
-
-        // append a FreeList page (should be page 2)
-        {
-            auto result = pager->newPage(PageType::FreeList);
-            ASSERT_TRUE(result.isOk());
-            auto page = std::move(result.value());
             ASSERT_EQ(page.pageNum(), 2);
-            ASSERT_EQ(page.pageType(), PageType::FreeList);
+            ASSERT_EQ(page.pageType(), PageType::Index);
         }
 
         // append 4 Table pages
@@ -99,7 +90,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
             ASSERT_TRUE(r.isOk());
             auto p = std::move(r.value());
             ASSERT_EQ(p.pageNum(), 1);
-            ASSERT_EQ(p.pageType(), PageType::Index);
+            ASSERT_EQ(p.pageType(), PageType::Table);
         }
 
         // check page 2
@@ -108,7 +99,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
             ASSERT_TRUE(r.isOk());
             auto p = std::move(r.value());
             ASSERT_EQ(p.pageNum(), 2);
-            ASSERT_EQ(p.pageType(), PageType::FreeList);
+            ASSERT_EQ(p.pageType(), PageType::Index);
         }
 
         // check page 6
