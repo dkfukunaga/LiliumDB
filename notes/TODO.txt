@@ -1,6 +1,9 @@
 TODO:
 ====
 LRUPager:
+- initFile should initPage(0, PageType::Table)
+    - set level to 0
+    - shouldn't need sentinel value for highestAllocated_ anymore
 * add pageType to Frame and PageGuard
     x read on load from pageIO
     - remember to set to Invalid on delete
