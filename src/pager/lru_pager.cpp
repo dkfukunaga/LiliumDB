@@ -42,23 +42,32 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     if (pageNum > highestAllocated_) {
         return Err(Status::fileErr("Page out of range."));
     }
+
+    // check if page is already in buffer pool
     auto mapIter = pageMap_.find(pageNum);
     if (mapIter != pageMap_.end()) {
         auto frameIter = mapIter->second;
         lruList_.splice(lruList_.begin(), lruList_, frameIter);
         Frame& frame = frames_[*frameIter];
 
-        return Ok(PageGuard(this, pageNum, frame.span));
+        return Ok(PageGuard(this, pageNum, frame.pageType, frame.span));
     }
+
+    // else, allocate a new frame and read page from disk
     FrameIndex frameIndex;
     ASSIGN_OR_RETURN(frameIndex, allocateFrame(pageNum));
     Frame& frame = frames_[frameIndex];
     RETURN_ON_ERROR(pageIO_->readPage(pageNum, frame.span));
 
-    return Ok(PageGuard(this, pageNum, frame.span));
+    // read page type and set in Frame
+    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+    ByteView view = frame.span.subview(pageOffset, PAGE_HEADER_SIZE);
+    frame.pageType = view.get<PageType>(offsetof(PageHeader, pageType));
+
+    return Ok(PageGuard(this, pageNum, frame.pageType, frame.span));
 }
 
-DbResult<PageGuard> LRUPager::newPage(PageType type) {
+DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
     PageNum pageNum;
 
     if (highestAllocated_ == INVALID_PAGE) {
@@ -69,10 +78,9 @@ DbResult<PageGuard> LRUPager::newPage(PageType type) {
         pageNum = ++highestAllocated_;
         RETURN_ON_ERROR(allocateFrame(pageNum));
     }
-    PageGuard pageGuard;
 
-    ASSIGN_OR_RETURN(pageGuard, fetchPage(pageNum));
-    ASSIGN_OR_RETURN(pageGuard, initPage(std::move(pageGuard), type));
+    PageGuard pageGuard;
+    ASSIGN_OR_RETURN(pageGuard, initPage(pageNum, pageType));
 
     return Ok(std::move(pageGuard));
 }
@@ -211,13 +219,13 @@ DbResult<void> LRUPager::initFile() { // initialize new file header
     return Ok();
 }
 
-DbResult<PageGuard> LRUPager::initPage(PageGuard page, PageType type) {
-    PageOffset pageOffset = page.pageNum() == 0 ? FILE_HEADER_SIZE : 0;
+DbResult<PageGuard> LRUPager::initPage(PageNum pageNum, PageType pageType) {
+    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
 
     // initialize new page header
     PageHeader header;
 
-    header.pageType = type;
+    header.pageType = pageType;
     header.pageFlags = PageFlags();
     header.level = INVALID_PAGE_LEVEL;
     // skip reserved byte
@@ -226,6 +234,14 @@ DbResult<PageGuard> LRUPager::initPage(PageGuard page, PageType type) {
     header.next = INVALID_PAGE;
     header.prev = INVALID_PAGE;
     header.checksum = CHECKSUM_PLACEHOLDER;
+
+    // get Frame and set page type
+    Frame& frame = frames_[*pageMap_[pageNum]];
+    frame.pageType = pageType;
+
+    // get PageGuard for page
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, fetchPage(pageNum));
 
     // serialize page header
     ByteSpan pageHeaderSpan = page.subspan(pageOffset, PAGE_HEADER_SIZE);
@@ -243,7 +259,7 @@ DbResult<PageGuard> LRUPager::initPage(PageGuard page, PageType type) {
     return Ok(std::move(page));
 }
 
-DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
+DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum, PageType pageType) {
     FrameIndex index;
     if (nextFreeFrame_ < frames_.size()) {
         index = nextFreeFrame_++;
@@ -251,7 +267,7 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
         ASSIGN_OR_RETURN(index, evictLastUsedPage());
     }
 
-    frames_[index] = Frame(pool_, index, pageNum);
+    frames_[index] = Frame(pool_, index, pageNum, pageType);
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
@@ -292,23 +308,6 @@ DbResult<void> LRUPager::updateFileHeader() {
     // headerSpan.put<uint32_t>(offsetof(FileHeader, checksum), CHECKSUM_PLACEHOLDER);
 
     return Ok();
-}
-
-bool LRUPager::isValidPage(PageNum pageNum) {
-    PageGuard page;
-    auto r = fetchPage(pageNum);
-    if (r) {
-        page = std::move(r.value());
-    } else {
-        return false;
-    }
-    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
-
-    ByteView view = page.subview(pageOffset, PAGE_HEADER_SIZE);
-
-    PageType type = view.get<PageType>(offsetof(PageHeader, pageType));
-
-    return type != PageType::Invalid;
 }
 
 } // namespace LiliumDB
