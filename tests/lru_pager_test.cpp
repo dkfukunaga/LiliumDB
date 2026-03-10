@@ -79,7 +79,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
         ASSERT_TRUE(pager->close());
 
         // reopen file
-        result = LRUPager::open(path, OpenMode::ReadWrite);
+        result = LRUPager::open(path, OpenMode::ReadOnly);
         ASSERT_TRUE(result.isOk());
         pager = std::move(result.value());
         ASSERT_TRUE(pager->isOpen());
@@ -119,6 +119,9 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
             ASSERT_EQ(p.pageNum(), 6);
             ASSERT_EQ(p.pageType(), PageType::Table);
         }
+
+        // close file
+        ASSERT_TRUE(pager->close());
     }
     // pager goes out of scope and should close without error
 }
