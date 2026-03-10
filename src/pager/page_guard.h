@@ -18,8 +18,8 @@ class PageGuard {
 public:
     PageGuard()
         : pager_(nullptr)
-        , pageType_(PageType::Invalid)
         , pageNum_(INVALID_PAGE)
+        , pageType_(PageType::Invalid)
         , data_()
         , dirty_(false) { }
     /// Pins the given page in the buffer pool.
@@ -42,14 +42,18 @@ public:
     ByteView    subview(PageOffset start, uint16_t len) const;
     PageNum     pageNum() const { return pageNum_; }
     PageType    pageType() const { return pageType_; }
+    /// Invaldates unpins the underlying page and invalidates PageGuard
+    void        reset();
 
     PageGuard&  operator=(const PageGuard&) = delete;
     /// Unpins the current page and transfers ownership of the incoming pin.
     PageGuard&  operator=(PageGuard&& other) noexcept;
+    /// Returns true if valid PageGuard
+    explicit operator bool() const noexcept { return pager_ != nullptr; };
 private:
     PinManager* pager_;
-    PageType    pageType_;
     PageNum     pageNum_;
+    PageType    pageType_;
     ByteSpan    data_;
     bool        dirty_;
 

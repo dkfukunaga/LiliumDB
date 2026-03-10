@@ -60,6 +60,13 @@ ByteView PageGuard::subview(PageOffset start, uint16_t len) const {
     return data_.subview(start, len);
 }
 
+void PageGuard::reset() {
+    if (pager_) {
+        pager_->unpinPage(pageNum_);
+    }
+    invalidate();
+}
+
 PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
     if (this != &other) {
         // release current page
