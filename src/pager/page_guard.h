@@ -2,6 +2,7 @@
 #define LILIUMDB_PAGE_GUARD_H
 
 #include "common/types.h"
+#include "common/file_format.h"
 #include "utils/byte_span.h"
 #include "pin_manager.h"
 
@@ -15,9 +16,14 @@ class Pager;
 // Do not hold ByteSpan or ByteView past the lifetime of the guard.
 class PageGuard {
 public:
-    PageGuard() : pager_(nullptr), pageNum_(INVALID_PAGE), data_(), dirty_(false) { }
+    PageGuard()
+        : pager_(nullptr)
+        , pageType_(PageType::Invalid)
+        , pageNum_(INVALID_PAGE)
+        , data_()
+        , dirty_(false) { }
     /// Pins the given page in the buffer pool.
-    PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data);
+    PageGuard(PinManager* pager, PageNum pageNum, PageType pageType, ByteSpan data);
     PageGuard(const PageGuard&) = delete;
     /// Transfers ownership of the pin; the moved-from guard becomes invalid.
     PageGuard(PageGuard&& other) noexcept;
@@ -41,6 +47,7 @@ public:
     PageGuard&  operator=(PageGuard&& other) noexcept;
 private:
     PinManager* pager_;
+    PageType    pageType_;
     PageNum     pageNum_;
     ByteSpan    data_;
     bool        dirty_;
