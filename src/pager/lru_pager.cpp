@@ -89,8 +89,31 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
 }
 
 DbResult<void> LRUPager::deletePage(PageNum pageNum) {
+    // check for page 0
+    if (pageNum == 0) {
+        return Err(Status::invalidArg("Cannot delete page 0."));
+    }
 
-    return Err(Status::error("Page deletion not implemented yet."));
+    // get page to be deleted
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, fetchPage(pageNum));
+
+    // cache old freespace head and set new one
+    PageNum nextFree = freespaceHead_;
+    freespaceHead_ = pageNum;
+
+    // update page header
+    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+    ByteSpan span = page.subspan(pageOffset, sizeof(PageHeader));
+
+    span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
+    span.put<PageNum>(offsetof(PageHeader, next), nextFree);
+
+    // update frame
+    Frame& frame = frames_[*pageMap_[pageNum]];
+    frame.pageType = PageType::FreeList;
+
+    return Ok();
 }
 
 DbResult<void> LRUPager::flushPage(PageNum pageNum) {
