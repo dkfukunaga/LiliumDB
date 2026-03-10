@@ -21,7 +21,6 @@ LRUPager::open(std::string_view path, OpenMode mode, size_t poolSize) {
     } else {
         RETURN_ON_ERROR(lruPager->validateFileHeader());
     }
-    lruPager->highestAllocated_ = lruPager->appendStart_ - 1;
 
     std::unique_ptr<Pager> pager = std::move(lruPager);
     return Ok(std::move(pager));
@@ -32,6 +31,7 @@ DbResult<void> LRUPager::close() {
         assert(frame.pinCount == 0);
     }
 
+    RETURN_ON_ERROR(updateFileHeader());
     RETURN_ON_ERROR(flushAll());
     RETURN_ON_ERROR(pageIO_->close());
 
@@ -59,9 +59,24 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
 }
 
 DbResult<PageGuard> LRUPager::newPage(PageType type) {
+    PageNum pageNum;
 
-    return Err(Status::error("Page allocation not implemented yet."));
+    if (highestAllocated_ == INVALID_PAGE) {
+        appendStart_ = 1;
+        highestAllocated_ = 0;
+        pageNum = 0;
+    } else {
+        pageNum = ++highestAllocated_;
+        RETURN_ON_ERROR(allocateFrame(pageNum));
+    }
+    PageGuard pageGuard;
+
+    ASSIGN_OR_RETURN(pageGuard, fetchPage(pageNum));
+    ASSIGN_OR_RETURN(pageGuard, initPage(std::move(pageGuard), type));
+
+    return Ok(std::move(pageGuard));
 }
+
 DbResult<void> LRUPager::deletePage(PageNum pageNum) {
 
     return Err(Status::error("Page deletion not implemented yet."));
@@ -80,14 +95,19 @@ DbResult<void> LRUPager::flushPage(PageNum pageNum) {
 }
 
 DbResult<void> LRUPager::flushAll() {
-    for (PageNum i = 0; i <= highestAllocated_; ++i) {
-        if (pageMap_.find(i) != pageMap_.end()) {
-            RETURN_ON_ERROR(flush(i));
-            if (i == appendStart_) {
-                ++appendStart_;
+    if (highestAllocated_ == INVALID_PAGE) {
+        RETURN_ON_ERROR(flush(0));
+    } else {
+        for (PageNum i = 0; i <= highestAllocated_; ++i) {
+            if (pageMap_.find(i) != pageMap_.end()) {
+                RETURN_ON_ERROR(flush(i));
+                if (i == appendStart_) {
+                    ++appendStart_;
+                }
             }
         }
     }
+
     return Ok();
 }
 
@@ -141,12 +161,12 @@ DbResult<void> LRUPager::validateFileHeader() {
     // read metadata
     freespaceHead_ = headerView.get<PageNum>(offsetof(FileHeader, freespaceHead));
     appendStart_ = headerView.get<PageNum>(offsetof(FileHeader, pageCount));
+    highestAllocated_ = appendStart_ == 0 ? INVALID_PAGE : appendStart_ - 1;
 
     return Ok();
 }
 
-DbResult<void> LRUPager::initFile() {
-    // initialize new file header
+DbResult<void> LRUPager::initFile() { // initialize new file header
     FileHeader header;
 
     int64_t now = static_cast<int64_t>(std::time(nullptr));
@@ -155,23 +175,72 @@ DbResult<void> LRUPager::initFile() {
     header.fileFlags = FileFlags();
     header.versionMajor = VERSION_MAJOR;
     header.versionMinor = VERSION_MINOR;
-    header.pageCount = 1;
+    header.pageCount = 0;   // page 0 has not been initialized
     header.fileCreated = now;
     header.lastModified = now;
     header.freespaceHead = INVALID_PAGE;
+    // skip reserved bytes
     header.checksum = CHECKSUM_PLACEHOLDER;
 
     // allocate new page zero
     RETURN_ON_ERROR(allocateFrame(0));
 
-    // write file header to page zero
-    RETURN_ON_ERROR(serializeFileHeader(header));
+    // get PageGuard for page 0
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, fetchPage(0));
+
+    // serialize header
+    ByteSpan headerSpan = page.subspan(0, sizeof(FileHeader));
+
+    headerSpan.write(0, header.magicBytes, sizeof(header.magicBytes));
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileFlags);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMajor);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMinor);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, pageCount);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileCreated);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, lastModified);
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, freespaceHead);
+    // skip reserved bytes
+    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
 
     // initialize metadata
-    appendStart_ = 1;
+    appendStart_ = 0;
+    highestAllocated_ = INVALID_PAGE;
     freespaceHead_ = INVALID_PAGE;
 
     return Ok();
+}
+
+DbResult<PageGuard> LRUPager::initPage(PageGuard page, PageType type) {
+    PageOffset pageOffset = page.pageNum() == 0 ? FILE_HEADER_SIZE : 0;
+
+    // initialize new page header
+    PageHeader header;
+
+    header.pageType = type;
+    header.pageFlags = PageFlags();
+    header.level = INVALID_PAGE_LEVEL;
+    // skip reserved byte
+    header.slotCount = 0;
+    header.freeOffset = PAGE_HEADER_SIZE + pageOffset;
+    header.next = INVALID_PAGE;
+    header.prev = INVALID_PAGE;
+    header.checksum = CHECKSUM_PLACEHOLDER;
+
+    // serialize page header
+    ByteSpan pageHeaderSpan = page.subspan(pageOffset, PAGE_HEADER_SIZE);
+
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, pageType);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, pageFlags);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, level);
+    // skip reserved byte
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, slotCount);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, freeOffset);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, next);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, prev);
+    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, checksum);
+
+    return Ok(std::move(page));
 }
 
 DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
@@ -186,10 +255,6 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
-    if (pageNum > highestAllocated_) {
-        highestAllocated_ = pageNum;
-    }
-
     return Ok(index);
 }
 
@@ -197,26 +262,6 @@ DbResult<LRUPager::FrameIndex> LRUPager::evictLastUsedPage() {
 
 
     return Err(Status::error("Eviction not implemented yet."));
-}
-
-DbResult<void> LRUPager::serializeFileHeader(FileHeader header) {
-    PageGuard pageGuard;
-    ASSIGN_OR_RETURN(pageGuard, fetchPage(0));
-    ByteSpan headerSpan = pageGuard.subspan(0, sizeof(FileHeader));
-
-    // serialize header
-    headerSpan.write(0, header.magicBytes, sizeof(header.magicBytes));
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileFlags);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMajor);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMinor);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, pageCount);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileCreated);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, lastModified);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, freespaceHead);
-    // skip reserved bytes
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
-
-    return Ok();
 }
 
 DbResult<void> LRUPager::flush(PageNum pageNum) {
@@ -229,6 +274,41 @@ DbResult<void> LRUPager::flush(PageNum pageNum) {
     }
 
     return Ok();
+}
+
+DbResult<void> LRUPager::updateFileHeader() {
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, fetchPage(0));
+
+    ByteSpan headerSpan = page.subspan(0, FILE_HEADER_SIZE);
+
+    int64_t now = static_cast<int64_t>(std::time(nullptr));
+    uint32_t pageCount = highestAllocated_ == INVALID_PAGE ? 0 : highestAllocated_ + 1;
+
+    headerSpan.put<uint32_t>(offsetof(FileHeader, pageCount), pageCount);
+    headerSpan.put<int64_t>(offsetof(FileHeader, lastModified), now);
+    headerSpan.put<PageNum>(offsetof(FileHeader, freespaceHead), freespaceHead_);
+    // checksum placeholder
+    // headerSpan.put<uint32_t>(offsetof(FileHeader, checksum), CHECKSUM_PLACEHOLDER);
+
+    return Ok();
+}
+
+bool LRUPager::isValidPage(PageNum pageNum) {
+    PageGuard page;
+    auto r = fetchPage(pageNum);
+    if (r) {
+        page = std::move(r.value());
+    } else {
+        return false;
+    }
+    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+
+    ByteView view = page.subview(pageOffset, PAGE_HEADER_SIZE);
+
+    PageType type = view.get<PageType>(offsetof(PageHeader, pageType));
+
+    return type != PageType::Invalid;
 }
 
 } // namespace LiliumDB

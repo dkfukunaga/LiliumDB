@@ -81,11 +81,12 @@ private:
 
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();
-    DbResult<void>          initPage(PageNum pageNum, PageType type);
+    DbResult<PageGuard>     initPage(PageGuard page, PageType type);
     DbResult<FrameIndex>    allocateFrame(PageNum pageNum);
     DbResult<FrameIndex>    evictLastUsedPage();
-    DbResult<void>          serializeFileHeader(FileHeader header);
     DbResult<void>          flush(PageNum pageNum);
+    DbResult<void>          updateFileHeader();
+    bool                    isValidPage(PageNum pageNum);
 };
 
 } // namespace LiliumDB
