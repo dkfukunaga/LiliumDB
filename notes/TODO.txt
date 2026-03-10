@@ -1,0 +1,10 @@
+TODO:
+====
+LRUPager:
+- add pageType to Frame and PageGuard
+    - read on load from pageIO
+    - remember to set to Invalid on delete
+- implement page deletion
+- implement free list
+- implement evictLeastUsedPage
+
