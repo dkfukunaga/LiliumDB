@@ -41,6 +41,7 @@ public:
     /// ByteView throws std::out_of_range.
     ByteView    subview(PageOffset start, uint16_t len) const;
     PageNum     pageNum() const { return pageNum_; }
+    PageType    pageType() const { return pageType_; }
 
     PageGuard&  operator=(const PageGuard&) = delete;
     /// Unpins the current page and transfers ownership of the incoming pin.
