@@ -61,6 +61,11 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
         ASSERT_EQ(page.pageType(), PageType::Table);
     }
 
+    // attempt to fetch a page out of range
+    r2 = pager->fetchPage(99);
+    ASSERT_FALSE(r2);
+    ASSERT_EQ(r2.error().code(), Status::Code::InvalidArg);
+
     // close file
     page.reset();
     ASSERT_TRUE(pager->close());
@@ -173,4 +178,110 @@ TEST_F(LRUPagerTest, DeletePage) {
 
     // page goes out of scope and should unpin page
     // pager goes out of scope and should close without error
+}
+
+TEST_F(LRUPagerTest, PageEviction) {
+    // open a Pager with a small pool size
+    auto result = LRUPager::open(path, OpenMode::ReadWrite, 3);
+    ASSERT_TRUE(result);
+    auto pager = std::move(result.value());
+    ASSERT_TRUE(pager->isOpen());
+
+    // write garbage to page 0
+    {
+        auto pageResult = pager->fetchPage(0);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageNum(), 0);
+        ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // get freeOffset
+        ByteView view = page.subview(FILE_HEADER_SIZE, PAGE_HEADER_SIZE);
+        auto offset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
+
+        // write byte pattern
+        uint64_t garbage = 0xEFCDAB8967452301;
+        ByteSpan span = page.span();
+        span.put<uint64_t>(offset, garbage);
+
+        // set freeOffset
+        span.put<PageOffset>(FILE_HEADER_SIZE + offsetof(PageHeader, freeOffset), offset);
+    }
+
+    // append one Index page
+    {
+        auto pageResult = pager->newPage(PageType::Index);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageNum(), 1);
+        ASSERT_EQ(page.pageType(), PageType::Index);
+    }
+
+    // append 9 Table pages with a known byte pattern for verification
+    int sixseven = 0x6767;
+
+    for (int i = 2; i < 11; ++i) {
+        auto r = pager->newPage(PageType::Table);
+        ASSERT_TRUE(r);
+        auto page = std::move(r.value());
+        ASSERT_EQ(page.pageNum(), i);
+        ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // get freeOffset
+        ByteView view = page.subview(0, PAGE_HEADER_SIZE);
+        auto offset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
+
+        // write byte pattern
+        ByteSpan span = page.span();
+
+        for (int j = 0; j < i; ++j) {
+            span.put<int>(offset, sixseven);
+            offset += sizeof(sixseven);
+        }
+
+        // set freeOffset
+        span.put<PageOffset>(offsetof(PageHeader, freeOffset), offset);
+    }
+
+    // verify pages were flushed on eviction
+    // check page 0 (Table Page)
+    {
+        auto pageResult = pager->fetchPage(0);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageNum(), 0);
+        ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // check page 1 (Index page)
+        pageResult = pager->fetchPage(1);
+        ASSERT_TRUE(pageResult);
+        page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageNum(), 1);
+        ASSERT_EQ(page.pageType(), PageType::Index);
+    }
+
+    // check pages 2-10 (Table Pages)
+    for (int i = 2; i < 11; ++i) {
+        auto r = pager->fetchPage(i);
+        ASSERT_TRUE(r);
+        auto page = std::move(r.value());
+        ASSERT_EQ(page.pageNum(), i);
+        ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // verify byte pattern
+        int sixseven = 0x6767;
+        int data;
+        ByteView view = page.span();
+        PageOffset offset = PAGE_HEADER_SIZE;
+
+        for (int j = 0; j < i; ++j) {
+            data = view.get<int>(offset);
+            ASSERT_EQ(data, sixseven);
+            offset += sizeof(data);
+        }
+
+        // verify freeOffset
+        PageOffset pageOffset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
+        ASSERT_EQ(pageOffset, offset);
+    }
 }
