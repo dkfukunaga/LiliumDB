@@ -43,7 +43,7 @@ DbResult<void> LRUPager::close() {
 
 DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     if (pageNum > highestAllocated_) {
-        return Err(Status::fileErr("Page out of range."));
+        return Err(Status::invalidArg("Page out of range."));
     }
 
     // check if page is already in buffer pool
@@ -86,9 +86,16 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         // re-initialize page
         ASSIGN_OR_RETURN(page, initPage(std::move(page), pageType));
     } else {
+        // get next page number
         pageNum = ++highestAllocated_;
-        RETURN_ON_ERROR(allocateFrame(pageNum));
-        ASSIGN_OR_RETURN(page, fetchPage(pageNum));
+
+        // allocate a frame in the buffer pool
+        FrameIndex index;
+        ASSIGN_OR_RETURN(index, allocateFrame(pageNum));
+        Frame& frame = frames_[index];
+
+        // contruct PageGuard to send to initPage
+        page = PageGuard(this, pageNum, pageType, frame.span);
         ASSIGN_OR_RETURN(page, initPage(std::move(page), pageType));
     }
 
