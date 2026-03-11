@@ -17,7 +17,7 @@ inline constexpr uint8_t VERSION_MAJOR = 0;
 inline constexpr uint8_t VERSION_MINOR = 0;
 
 // checksum placeholder value
-inline constexpr uint32_t CHECKSUM_PLACEHOLDER = 0xEFBEADDE;
+inline constexpr uint32_t CHECKSUM_PLACEHOLDER = 0xA71C555A;
 
 // page size
 inline constexpr uint16_t PAGE_SIZE = 4096;
