@@ -7,9 +7,10 @@
 
 namespace LiliumDB {
 
-PageGuard::PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data)
+PageGuard::PageGuard(PinManager* pager, PageNum pageNum, PageType pageType, ByteSpan data)
     : pager_(pager)
     , pageNum_(pageNum)
+    , pageType_(pageType)
     , data_(data)
     , dirty_(false) {
     pager_->pinPage(pageNum);
@@ -18,6 +19,7 @@ PageGuard::PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data)
 PageGuard::PageGuard(PageGuard&& other) noexcept
     : pager_(other.pager_)
     , pageNum_(other.pageNum_)
+    , pageType_(other.pageType_)
     , data_(other.data_)
     , dirty_(other.dirty_) {
     // invalidate other PageGuard
@@ -58,6 +60,13 @@ ByteView PageGuard::subview(PageOffset start, uint16_t len) const {
     return data_.subview(start, len);
 }
 
+void PageGuard::reset() {
+    if (pager_) {
+        pager_->unpinPage(pageNum_);
+    }
+    invalidate();
+}
+
 PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
     if (this != &other) {
         // release current page
@@ -68,6 +77,7 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
         // move ownership from other PageGuard
         pager_      = other.pager_;
         pageNum_    = other.pageNum_;
+        pageType_   = other.pageType_;
         data_       = other.data_;
         dirty_      = other.dirty_;
 
@@ -80,6 +90,7 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
 void PageGuard::invalidate() noexcept {
     pager_ = nullptr;
     pageNum_ = INVALID_PAGE;
+    pageType_ = PageType::Invalid;
     data_ = ByteSpan();
     dirty_ = false;
 }
