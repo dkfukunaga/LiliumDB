@@ -32,7 +32,6 @@ DbResult<void> LRUPager::close() {
     }
 
     if (openMode_ != OpenMode::ReadOnly) {
-        RETURN_ON_ERROR(updateFileHeader());
         RETURN_ON_ERROR(flushAll());
     }
 
@@ -151,6 +150,7 @@ DbResult<void> LRUPager::flushAll() {
     if (highestAllocated_ == INVALID_PAGE) {
         RETURN_ON_ERROR(flush(0));
     } else {
+        RETURN_ON_ERROR(updateFileHeader());
         for (PageNum i = 0; i <= highestAllocated_; ++i) {
             if (pageMap_.find(i) != pageMap_.end()) {
                 RETURN_ON_ERROR(flush(i));
