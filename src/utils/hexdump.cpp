@@ -2,76 +2,119 @@
 
 namespace LiliumDB {
 
+void hexdump(std::ostream& out,
+             const ByteView& view,
+             uint64_t baseAddress,
+             std::string_view label) {
+    static constexpr char DOUBLE_LINE[]  = "================================================================================";
+    static constexpr char SINGLE_LINE[]  = "|--------+----------------------------------------------------+----------------|";
+    static constexpr char ADDRESS_LINE[] = "|Address:|   0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F  |     ASCII:     |";
 
-void hexdump(
-    std::ostream& out,
-    const ByteView& view,
-    uint64_t base_address,
-    std::string_view label
-) {
-    static constexpr char HEX_CHARS[] = "0123456789ABCDEF";
+    char currLine[81] = {};
+    char lastLine[81] = {};
+    int lineOffset = 0;
 
-    int64_t len = view.size();
-    if (len == 0) {
-        return;
-    }
-
-    int64_t address = base_address;
-    int64_t end = base_address + len;
-
-    char line[81];
-    int offset = 0;
-    auto write = [&](const char* fmt, auto... args) {
-        offset += snprintf(line + offset, sizeof(line) - offset, fmt, args...);
+    auto writeToLine = [&](const char* fmt, auto... args) {
+        lineOffset += snprintf(currLine + lineOffset, sizeof(currLine) - lineOffset, fmt, args...);
+    };
+    auto outputLine = [&]() {
+        out << currLine << '\n';
+        lineOffset = 0;
     };
 
-    for (int i = 0; i < len; i += 16) {
-        offset = 0;
+    out << label << '\n';
+    out << DOUBLE_LINE << '\n';
+    out << ADDRESS_LINE << '\n';
+    out << SINGLE_LINE << '\n';
+
+    uint64_t end = baseAddress + view.size();
+    uint64_t offset = baseAddress % 16;
+
+    // iterators for hex section and ASCII section
+    auto byteIter = view.begin();
+    auto asciiIter = view.begin();
+
+    // save the last line of bytes to omit repeated lines
+    uint8_t lastBytes[16] = {};
+    bool canRepeat = false;
+    bool inRepeat = false;
+
+    for (uint64_t address = baseAddress - offset; address < end; address += 16) {
+        // skip repeated lines
+        if (canRepeat && end - address > 16) {
+            if (memcmp(lastBytes, &(*byteIter), 16) == 0) {
+                if (!inRepeat) {
+                    out << "*\n";
+                    inRepeat = true;
+                }
+                byteIter += 16;
+                asciiIter += 16;
+                continue;
+            } else if (inRepeat) {
+                // rewind by 16 and let the loop reformat
+                byteIter -= 16;
+                asciiIter -= 16;
+                address -= 16;
+                inRepeat = false;
+            }
+        } else if (inRepeat && address + 16 > end) {
+            // rewind by 16 and let the loop reformat
+            byteIter -= 16;
+            asciiIter -= 16;
+            address -= 16;
+            inRepeat = false;
+        }
+
+        // cache bytes and set canRepeat unless partial line
+        if (address >= baseAddress && address + 16 <= end) {
+            memcpy(lastBytes, &(*byteIter), 16);
+            canRepeat = true;
+        }
 
         // print memory address in hex in an 8 wide column with leading 0's
-        write("|%08llX| ", address);
+        writeToLine("|%08llX| ", address);
 
-        // print blank spaces if base_address is not a multiple of 16
-        for (int j = 0; j < base_address % 16; ++ j) {
-            write("   ");
-            if (j == 7) {
-                write(" ");
-            }
-        }
-
-        // loop through the next 16 bytes (if they exist) and print the bytes in
-        // hex with a leading 0, or leave a blank space if that byte doens't exist
-        // for an incomplete line, with an extra space between bytes 8 and 9.
-        for (int j = 0; j < 16; ++j) {
-            if (i + j < end) {
-                write(" %02X", view[i + j]);
+        // print hex values
+        for (uint64_t i = 0; i < 16; ++i) {
+            if (address + i < baseAddress || address + i >= end) {
+                // print blanks for bytes outside of ByteView
+                writeToLine("   ");
             } else {
-                write("   ");
+                writeToLine( " %02X", *byteIter++);
             }
-            if (j == 7) {
-                write(" ");
+            if (i == 7) {
+                // exta space between sets of 8 bytes
+                writeToLine(" ");
             }
         }
 
-        // print 2 spaces and a | to separate ascii representation
-        write("  |");
-        // loop through the same 16 bytes (if they exist) as above, printing the
-        // ascii character if it is printable, '.' if it is unprintable, or an empty
-        // space if the byte doesn't exist
-        unsigned char curr_byte = 0;
-        for (int j = 0; j < 16; ++j) {
-            if (i + j < end){
-                curr_byte = view[i + j];
-                if (curr_byte >= 32 && curr_byte <= 126) {
-                    write("%c", curr_byte);
-                } else {
-                    write(".");
-                }
+        // print 2 spaces and a | to separate ASCII representation
+        writeToLine("  |");
+
+        // print ASCII represetntation
+        for (uint64_t i = 0; i < 16; ++i) {
+            if (address + i < baseAddress || address + i >= end) {
+                // print blanks for bytes outside of ByteView
+                writeToLine(" ");
+            } else if (*asciiIter >= 32 && *asciiIter <= 126) {
+                // only print valid ASCII characters
+                writeToLine("%c", *asciiIter++);
             } else {
-                write(" ");
+                // filler for non-ASCII bytes
+                writeToLine(".");
+                ++asciiIter;
             }
         }
+        // cache current line
+        memcpy(lastLine, currLine, 81);
+
+        // end line and flush to out
+        writeToLine("|");
+        outputLine();
     }
+
+    out << DOUBLE_LINE << '\n';
+
 
 }
 
