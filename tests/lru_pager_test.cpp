@@ -1,6 +1,10 @@
 #include "pager/lru_pager.h"
+#include "utils/hexdump.h"
 
 #include <filesystem>
+#include <fstream>
+#include <ctime>
+#include <string>
 
 #include "gtest/gtest.h"
 
@@ -291,5 +295,22 @@ TEST_F(LRUPagerTest, PageEviction) {
         // verify freeOffset
         PageOffset pageOffset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
         ASSERT_EQ(pageOffset, offset);
+    }
+
+    ASSERT_TRUE(pager->flushAll());
+
+    int64_t now = static_cast<int64_t>(std::time(nullptr));
+    std::string hexdumpFileName = "../../../../debug/hexdump" + std::to_string(now) + ".log";
+    std::ofstream hexdumpFile(hexdumpFileName);
+
+    hexdumpFile << path << "\n";
+
+    for (int i = 0; i < 11; ++i) {
+        auto r = pager->fetchPage(i);
+        ASSERT_TRUE(r);
+        auto page = std::move(r.value());
+
+        hexdumpFile << "\n";
+        hexdump(hexdumpFile, page.view(), i * PAGE_SIZE, "Page " + std::to_string(i));
     }
 }
