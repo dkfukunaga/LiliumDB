@@ -6,9 +6,10 @@ void hexdump(std::ostream& out,
              const ByteView& view,
              uint64_t baseAddress,
              std::string_view label) {
-    static constexpr char DOUBLE_LINE[]  = "================================================================================";
-    static constexpr char SINGLE_LINE[]  = "|--------+----------------------------------------------------+----------------|";
-    static constexpr char ADDRESS_LINE[] = "|Address:|   0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F  |     ASCII:     |";
+    static constexpr char DOUBLE_LINE[]  = "================================================================================\n";
+    static constexpr char SINGLE_LINE[]  = "|--------+----------------------------------------------------+----------------|\n";
+    static constexpr char ADDRESS_LINE[] = "|Address:|   0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F  |     ASCII:     |\n";
+    static constexpr char SKIPPED_LINE[] = "|********|  *                                                 |                |\n";
 
     char currLine[81] = {};
     char lastLine[81] = {};
@@ -23,9 +24,9 @@ void hexdump(std::ostream& out,
     };
 
     out << label << '\n';
-    out << DOUBLE_LINE << '\n';
-    out << ADDRESS_LINE << '\n';
-    out << SINGLE_LINE << '\n';
+    out << DOUBLE_LINE;
+    out << ADDRESS_LINE;
+    out << SINGLE_LINE;
 
     uint64_t end = baseAddress + view.size();
     uint64_t offset = baseAddress % 16;
@@ -44,7 +45,7 @@ void hexdump(std::ostream& out,
         if (canRepeat && end - address > 16) {
             if (memcmp(lastBytes, &(*byteIter), 16) == 0) {
                 if (!inRepeat) {
-                    out << "*\n";
+                    out << SKIPPED_LINE;
                     inRepeat = true;
                 }
                 byteIter += 16;

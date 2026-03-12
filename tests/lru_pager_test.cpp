@@ -310,7 +310,6 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
 
-        hexdumpFile << "\n";
         hexdump(hexdumpFile, page.view(), i * PAGE_SIZE, "Page " + std::to_string(i));
     }
 }
