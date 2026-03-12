@@ -1,7 +1,9 @@
-#ifndef LILIUMDB_RID_H
-#define LILIUMDB_RID_H
+#ifndef LILIUMDB_BTREE_TYPES_H
+#define LILIUMDB_BTREE_TYPES_H
 
 #include "common/types.h"
+
+#include <vector>
 
 namespace LiliumDB {
 
@@ -10,10 +12,10 @@ namespace LiliumDB {
 // Ordering is by page first, then slot within page.
 struct RID {
     PageNum page = INVALID_PAGE;
-    SlotNum slot = INVALID_SLOT;
+    SlotIndex slot = INVALID_SLOT;
 
     constexpr RID() noexcept = default;
-    constexpr RID(PageNum pn, SlotNum sn) noexcept: page(pn), slot(sn) { }
+    constexpr RID(PageNum pn, SlotIndex sn) noexcept: page(pn), slot(sn) { }
 
     // Returns false if either component holds its sentinel value.
     constexpr bool isValid() const noexcept {
@@ -39,6 +41,13 @@ struct RID {
         return !(lhs < rhs);
     }
 };
+
+struct Slot {
+    PageOffset  offset;
+    RecordSize  size;
+};
+
+using Record = std::vector<uint8_t>;
 
 } // namespace LiliumDB
 

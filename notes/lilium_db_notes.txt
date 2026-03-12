@@ -13,10 +13,11 @@ TODO:
 
 query/      — processes queries
 catalog/    — knows what tables and schemas exist
-access/     — accesses the raw data (records, indexes, tree structures)
+btree/      — B+ tree structure, record serialization
 pager/      — manages pages in memory and on disk
 storage/    — raw file I/O
-common/     — shared utilities
+common/     — DB-specific types and error handling
+utils/      — shared utilities
 
 Database is responsible for:
     Constructing and owning all components
@@ -30,9 +31,7 @@ Database is responsible for:
         Database
            │
         Catalog
-      ┌────┴────┐
-RecordStore  BTreeIndex
-      └────┬────┘
+           │
          BTree
            │
          Pager
@@ -43,74 +42,76 @@ RecordStore  BTreeIndex
 ┌─────────────────────────────────────────────────┐
 │                 QueryProcessor                  │
 │          parse, plan, execute queries           │
-│         Parser, Planner, Executor               │
-└─────────────────────────┬───────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────┐
-│                   Catalog                       │
-│     TableDef, ColumnDef, Schema, CRUD           │
-│              SystemCatalog                      │
-└────────────────┬─────────────────┬──────────────┘
-                 │                 │
-┌────────────────▼──────┐   ┌──────▼────────────────┐
-│      RecordStore      │   │       Index           │
-│  slots, null bitmaps  │   │  key → RID mappings   │
-│  record layout        │   │  insertEntry          │
-│  serialize/deserialize│   │  deleteEntry, scan    │
-│                       │   │    BTreeIndex         │
-└────────────┬──────────┘   └─────────┬─────────────┘
-             │                        │
-             └────────────┬───────────┘
-                          │
-┌─────────────────────────▼───────────────────────┐
-│                     BTree                       │
+│            Parser, Planner, Executor            │
+└────────────────────────┬────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────┐
+│                     Catalog                     │
+│        TableDef, ColumnDef, Schema, CRUD        │
+│                  SystemCatalog                  │
+│     (system tables are themselves clustered     │
+│       BTrees; bootstrapped at open time)        │
+└────────────────────────┬────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────┐
+│                      BTree                      │
 │         splitting, merging, traversal,          │
 │         key comparison, page navigation         │
-└─────────────────────────┬───────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────┐
-│                     Pager                       │
-│         buffer pool, dirty tracking,            │
-│              LRU eviction policy                │
-│                   LRUPager                      │
-└─────────────────────────┬───────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────┐
-│                    PageIO                       │
+│   Clustered: leaf pages hold full serialized    │
+│    rows. Secondary indexes: leaf pages hold     │
+│      (secondary_key → primary_key) pairs.       │
+│        Record serialization lives here.         │
+└────────────────────────┬────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────┐
+│                      Pager                      │
+│          buffer pool, dirty tracking,           │
+│               LRU eviction policy               │
+│                    LRUPager                     │
+└────────────────────────┬────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────┐
+│                      PageIO                     │
 │       open/close files, readPage/writePage      │
-│              raw byte I/O only                  │
-│                 StdPageIO                       │
-└─────────────────────────┬───────────────────────┘
-                          │
-                         disk
+│                raw byte I/O only                │
+│                    StdPageIO                    │
+└────────────────────────┬────────────────────────┘
+                         │
+                        disk
 
 
 
 src/
-    common/
-        types.h                 — PageNum, SlotNum, RID, and other simple aliases
-        status.h                — Status class
+    utils/
         byte_span.h             — ByteSpan, ByteView
+        byte_span_macros.h      — SPAN_WRITE_STRUCT_FIELD, VIEW_READ_STRUCT_FIELD
+        result.h                — Result<T,E>, Result<void,E>, Ok<T>, Err<E>
+        result_macros.h         — RETURN_ON_ERROR, ASSIGN_OR_RETURN
+        flags.h                 — Flags<Enum> type-safe bitmask wrapper
+    common/
+        core.h                  — types.h, db_results.h
+        types.h                 — PageNum, SlotNum, FileOffset, PageOffset
+        status.h                — Status class
+        db_result.h             — result.h, result_macros.h, status.h, DbResult<T>
         file_format.h           — PAGE_SIZE, magic bytes, header layout constants
     storage/
-        page_io.h               — interface
-        std_page_io.h           — fstream PageIO
+        page_io.h               — PageIO interface
+        std_page_io.h           — fstream-based PageIO implementation
         std_page_io.cpp
     pager/
-        pager.h                 — interface
-        lru_pager.h             — LRU Pager
+        page_guard.h            — PageGuard RAII handle (move-only, pins page while alive)
+        page_guard.cpp
+        pin_manager.h           — Pin Manager interface for PageGuard
+        pager.h                 — Pager interface
+        lru_pager.h             — LRU buffer pool implementation
         lru_pager.cpp
-    access/
-        record_store.h          — RecordStore
-        record_store.cpp
-        index.h                 — Index interface
-        btree_index.h           — B+ Tree Index
-        btree_index.cpp
-        btree.h                 — B+ Tree
+    btree/
+        btree_types.h           — RID, Slot
+        btree.h                 — BTree (clustered primary + secondary index trees)
         btree.cpp
     catalog/
         catalog.h               — Catalog interface
-        system_catalog.h
+        system_catalog.h        — SystemCatalog (bootstraps SYS_TABLES, SYS_COLUMNS, etc.)
         system_catalog.cpp
     query/
         parser.h
@@ -391,7 +392,7 @@ DEFAULT_VAL     VARCHAR
 
 SYS_TYPES
 =========
-TYPE_ID         INT
+TYPE_ID         INT (PK)
 TYPE_NAME       VARCHAR
 TYPE_LENGTH     SMALLINT    // -1 for variable length
 TYPE_CATEGORY   SMALLINT    // maps to an internal enum: INTEGER, FLOAT, STRING, BOOLEAN, DATETIME, ENUM, ARRAY
@@ -405,7 +406,7 @@ VALUE_NAME      VARCHAR
 SYS_SEQUENCES
 =============
 TABLE_ID    INT (PK, FK -> SYS_TABLES.TABLE_ID)
-NEXT_ID     INT
+NEXT_ID     INT             // int64?
 
 
 enum class BuiltInType : uint16_t {
@@ -423,8 +424,8 @@ enum class BuiltInType : uint16_t {
     DateTime = 12,  // not yet implemented
 };
 
-static constexpr uint16_t USER_TYPE_START  = 1000;
-static constexpr uint16_t USER_TABLE_START = 100;
+static constexpr uint16_t USER_TYPE_ID_START  = 1000;
+static constexpr uint16_t USER_TABLE_ID_START = 100;
 
 enum class BuiltInTable : uint32_t {
     SysTables    = 1,
@@ -432,9 +433,7 @@ enum class BuiltInTable : uint32_t {
     SysEnumDefs  = 3,
     SysSequences = 4,
     SysColumns   = 5,
-}
-
-static constexpr PageNum USER_TABLE_ID_START = 100;
+};
 
 
 
@@ -451,11 +450,10 @@ static constexpr PageNum USER_TABLE_ID_START = 100;
 
 
 
-    File:   database.db
-   Range:   0x00000000 ~ 0x00000FFF
+database.db
 ================================================================================
 |Address:|   0  1  2  3  4  5  6  7   8  9  A  B  C  D  E  F  |     ASCII:     |
-================================================================================
+|--------+----------------------------------------------------+----------------|
 |00000000|  CA 70 CA FE 4C 44 42 00  00 00 01 00 02 00 00 00  |.p..LDB.........|
 |00000010|  01 00 00 00 FF FF FF FF  00 00 00 00 31 2D 0B 00  |............1-..|
 |00000020|  00 00 00 00 31 2D 0B 00  00 00 00 00 00 00 00 00  |....1-..........|
