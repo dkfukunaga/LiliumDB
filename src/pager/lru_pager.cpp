@@ -62,7 +62,7 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     RETURN_ON_ERROR(pageIO_->readPage(pageNum, frame.span));
 
     // read page type and set in Frame
-    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+    PageOffset pageOffset = getPageOffset(pageNum);
     ByteView view = frame.span.subview(pageOffset, PAGE_HEADER_SIZE);
     frame.pageType = view.get<PageType>(offsetof(PageHeader, pageType));
 
@@ -78,7 +78,7 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         ASSIGN_OR_RETURN(page, fetchPage((pageNum)));
 
         // reset freespace head
-        PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+        PageOffset pageOffset = getPageOffset(page.pageNum());
         ByteView view = page.subview(pageOffset, sizeof(PageHeader));
         freespaceHead_ = view.get<PageNum>(offsetof(PageHeader, next));
 
@@ -122,7 +122,7 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     freespaceHead_ = pageNum;
 
     // update page header
-    PageOffset pageOffset = pageNum == 0 ? FILE_HEADER_SIZE : 0;
+    PageOffset pageOffset = getPageOffset(pageNum);
     ByteSpan span = page.subspan(pageOffset, sizeof(PageHeader));
 
     span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
@@ -192,10 +192,9 @@ DbResult<void> LRUPager::validateFileHeader() {
     ByteView headerView = page.subview(0, sizeof(FileHeader));
 
     // check magic bytes
-    constexpr size_t mBytesLen = sizeof(FileHeader::magicBytes);
-    uint8_t mBytes[mBytesLen];
-    headerView.read(offsetof(FileHeader, magicBytes), mBytes, mBytesLen);
-    if (memcmp(mBytes, MAGIC_BYTES.data(), mBytesLen) != 0) {
+    uint8_t mBytes[MAGIC_BYTES_LEN];
+    headerView.read(offsetof(FileHeader, magicBytes), mBytes, MAGIC_BYTES_LEN);
+    if (memcmp(mBytes, MAGIC_BYTES, MAGIC_BYTES_LEN) != 0) {
         return Err(Status::fileInvalid("Incorrect file type."));
     }
 
@@ -225,21 +224,6 @@ DbResult<void> LRUPager::initFile() {
     highestAllocated_ = 0;
     freespaceHead_ = INVALID_PAGE;
 
-    // create a new file header
-    int64_t now = static_cast<int64_t>(std::time(nullptr));
-
-    FileHeader header;
-    std::memcpy(header.magicBytes, MAGIC_BYTES.data(), sizeof(header.magicBytes));
-    header.fileFlags = FileFlags();
-    header.versionMajor = VERSION_MAJOR;
-    header.versionMinor = VERSION_MINOR;
-    header.pageCount = 1;
-    header.fileCreated = now;
-    header.lastModified = now;
-    header.freespaceHead = INVALID_PAGE;
-    // skip reserved bytes
-    header.checksum = CHECKSUM_PLACEHOLDER;
-
     // allocate new page zero and set to PageType::Table
     FrameIndex index;
     ASSIGN_OR_RETURN(index, allocateFrame(0));
@@ -249,19 +233,18 @@ DbResult<void> LRUPager::initFile() {
     PageGuard page;
     ASSIGN_OR_RETURN(page, fetchPage(0));
 
+    // create a new file header
+    int64_t now = static_cast<int64_t>(std::time(nullptr));
+
+    FileHeader header;
+    std::memcpy(header.magicBytes, MAGIC_BYTES, MAGIC_BYTES_LEN);
+    header.pageCount = 1;
+    header.fileCreated = now;
+    header.lastModified = now;
+
     // serialize header
     ByteSpan headerSpan = page.subspan(0, sizeof(FileHeader));
-
-    headerSpan.write(0, header.magicBytes, sizeof(header.magicBytes));
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileFlags);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMajor);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, versionMinor);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, pageCount);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, fileCreated);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, lastModified);
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, freespaceHead);
-    // skip reserved bytes
-    SPAN_WRITE_STRUCT_FIELD(headerSpan, header, checksum);
+    headerSpan.put<FileHeader>(0, header);
 
     // initialize page 0 to a Table page
     RETURN_ON_ERROR(initPage(std::move(page), PageType::Table));
@@ -270,37 +253,28 @@ DbResult<void> LRUPager::initFile() {
 }
 
 DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {
-    PageOffset pageOffset = page.pageNum() == 0 ? FILE_HEADER_SIZE : 0;
+    PageOffset pageOffset = getPageOffset(page.pageNum());
 
     // initialize new page header
     PageHeader header;
 
     header.pageType = pageType;
-    header.pageFlags = PageFlags();
-    header.level = INVALID_PAGE_LEVEL;
-    // skip reserved byte
-    header.slotCount = 0;
     header.freeOffset = PAGE_HEADER_SIZE + pageOffset;
-    header.next = INVALID_PAGE;
-    header.prev = INVALID_PAGE;
-    header.checksum = CHECKSUM_PLACEHOLDER;
+
+    // serialize page header
+    ByteSpan pageHeaderSpan = page.subspan(pageOffset, PAGE_HEADER_SIZE);
+    pageHeaderSpan.put<PageHeader>(0, header);
+
+    // initialize new page footer
+    PageFooter footer;
+
+    // serialize page footer
+    ByteSpan pageFooterSpan = page.subspan(PAGE_END_OFFSET, PAGE_FOOTER_SIZE);
+    pageFooterSpan.put<PageFooter>(0, footer);
 
     // set page type in Frame and PageGuard
     Frame& frame = frames_[*pageMap_[page.pageNum()]];
     frame.pageType = pageType;
-
-    // serialize page header
-    ByteSpan pageHeaderSpan = page.subspan(pageOffset, PAGE_HEADER_SIZE);
-
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, pageType);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, pageFlags);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, level);
-    // skip reserved byte
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, slotCount);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, freeOffset);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, next);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, prev);
-    SPAN_WRITE_STRUCT_FIELD(pageHeaderSpan, header, checksum);
 
     return Ok(PageGuard(this, frame.pageNum, frame.pageType, frame.span));
 }
@@ -377,6 +351,10 @@ DbResult<void> LRUPager::updateFileHeader() {
     // headerSpan.put<uint32_t>(offsetof(FileHeader, checksum), CHECKSUM_PLACEHOLDER);
 
     return Ok();
+}
+
+PageOffset LRUPager::getPageOffset(PageNum pageNum) const noexcept {
+    return pageNum == 0 ? PAGE_ZERO_OFFSET : 0;
 }
 
 } // namespace LiliumDB
