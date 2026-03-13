@@ -84,6 +84,8 @@ public:
 
     // Reads sizeof(T) bytes at start from this view and returns as T. Throws if out of range.
     template <class T> T                get(size_t start) const;
+    // Reads sizeof(T) bytes at start from this view and assigns to T. Throws if out of range.
+    template <class T> void             get(size_t start, T& dst) const;
     // Copies len bytes from this view into dst starting at start.
     void                                read(size_t start, uint8_t* dst, size_t len) const;
 
@@ -180,6 +182,11 @@ inline T ByteView::get(size_t start) const {
         throw std::out_of_range("read out of range");
     
     return value;
+}
+
+template <class T>
+inline void ByteView::get(size_t start, T& dst) const {
+    dst = get<T>(start);
 }
 
 inline void ByteView::read(size_t start, uint8_t* dst, size_t len) const {

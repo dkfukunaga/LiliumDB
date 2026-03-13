@@ -5,12 +5,12 @@
 
 // Helper macros
 
-#define SPAN_WRITE_STRUCT_FIELD(span, struc, field)                        \
-    (span).put<decltype(std::decay_t<decltype(struc)>::field)>(            \
+#define SPAN_WRITE_STRUCT_FIELD(span, struc, field)                     \
+    (span).put<decltype(std::decay_t<decltype(struc)>::field)>(         \
         offsetof(std::decay_t<decltype(struc)>, field), (struc).field)
 
-#define VIEW_READ_STRUCT_FIELD(view, struc, field)                 \
-    (view).get<decltype(std::decay_t<decltype(struc)>::field)>(    \
-        offsetof(std::decay_t<decltype(struc)>, field))
+#define VIEW_READ_STRUCT_FIELD(view, struc, field)                      \
+    (view).get<decltype(std::decay_t<decltype(struc)>::field)>(         \
+        offsetof(std::decay_t<decltype(struc)>, field), (struc).field)
 
 #endif
