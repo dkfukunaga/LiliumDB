@@ -470,7 +470,7 @@ File Header:
     00 00                       — file flags, none set
     00                          — version major 0
     00                          — version minor 0
-    05 00 00 00                 — num pages
+    06 00 00 00                 — num pages
     B4 EE B5 69 00 00 00 00     — file created timestamp
     B4 EE B5 69 00 00 00 00     — last modified timestamp
     04 00 00 00                 — freespace head
@@ -478,7 +478,7 @@ File Header:
     5A 55 1C A7                 — checksum (placeholder)
 
 Page Header:
-    01                          — page type = 01 (Table)
+    01                          — page type (PageType::Table)
     00                          — page flags, none set
     FF                          — btree level (INVALID_LEVEL)
     00                          — reserved (1 byte)

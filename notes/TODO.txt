@@ -1,13 +1,5 @@
 TODO:
 ====
-LRUPager:
-x initFile should initPage(0, PageType::Table)
-    x set level to 0
-    x shouldn't need sentinel value for highestAllocated_ anymore
-x add pageType to Frame and PageGuard
-    x read on load from pageIO
-x implement page deletion
-x implement free list
-x implement evictLeastUsedPage
-- test page eviction
-- test freelist
+BTree:
+- 
+
