@@ -148,8 +148,8 @@ TEST_F(LRUPagerTest, DeletePage) {
 
     int sixseven = 0x6767;
 
-    // append 3 Table pages (pages 1-3) with a byte pattern
-    for (int i = 1; i < 4; ++i) {
+    // append 4 Table pages (pages 1-4) with a byte pattern
+    for (int i = 1; i < 5; ++i) {
         auto result = pager->newPage(PageType::Table);
         ASSERT_TRUE(result.isOk());
         auto page = std::move(result.value());
@@ -213,21 +213,24 @@ TEST_F(LRUPagerTest, DeletePage) {
         }
     }
 
-    // append another page (should be page 4)
+    // append another page (should be page 5)
     auto pageResult = pager->newPage(PageType::Table);
     ASSERT_TRUE(pageResult);
     auto page = std::move(pageResult.value());
-    ASSERT_EQ(page.pageNum(), 4);
+    ASSERT_EQ(page.pageNum(), 5);
     ASSERT_EQ(page.pageType(), PageType::Table);
 
     // delete page 4 for manual inspection
     // should return InvalidArg error if PageGuard is still in scope
-    auto errResult = pager->deletePage(4);
+    auto errResult = pager->deletePage(5);
     ASSERT_FALSE(errResult);
     ASSERT_EQ(errResult.error().code(), Status::Code::InvalidArg);
 
     // reset PageGuard and then delete
     page.reset();
+    ASSERT_TRUE(pager->deletePage(5));
+
+    // delete page 4
     ASSERT_TRUE(pager->deletePage(4));
 
     // close pager
@@ -241,13 +244,28 @@ TEST_F(LRUPagerTest, DeletePage) {
     ASSERT_TRUE(pager->isOpen());
 
     // check freespaceHead in file header
-    pageResult = pager->fetchPage(0);
-    ASSERT_TRUE(pageResult);
-    page = std::move(pageResult.value());
-    auto view = page.subview(0, FILE_HEADER_SIZE);
-    PageNum freespaceHead = view.get<PageNum>(offsetof(FileHeader, freespaceHead));
-    ASSERT_EQ(freespaceHead, 4);
+    {
+        auto pageResult = pager->fetchPage(0);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        auto view = page.subview(0, FILE_HEADER_SIZE);
+        PageNum freespaceHead = view.get<PageNum>(offsetof(FileHeader, freespaceHead));
+        ASSERT_EQ(freespaceHead, 4);
+    }
 
+    // check next field on page 4, should point to page 5
+    {
+        auto pageResult = pager->fetchPage(4);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        auto view = page.subview(0, PAGE_HEADER_SIZE);
+
+        auto type = view.get<PageType>(offsetof(PageHeader, pageType));
+        ASSERT_EQ(type, PageType::FreeList);
+        auto nextFree = view.get<PageNum>(offsetof(PageHeader, next));
+        ASSERT_EQ(nextFree, 5);
+    }
+    
     // hexdump to a text file to manually inspect
     auto now = std::time(nullptr);
     std::string hexdumpFileName = "../../../../debug/hexdump_" + std::to_string(now) + ".hex";
@@ -255,7 +273,7 @@ TEST_F(LRUPagerTest, DeletePage) {
 
     hexdumpFile << path << "\n\n";
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 6; ++i) {
         auto r = pager->fetchPage(i);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
