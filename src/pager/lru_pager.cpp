@@ -62,8 +62,8 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     RETURN_ON_ERROR(pageIO_->readPage(pageNum, frame.span));
 
     // read page type and set in Frame
-    PageOffset pageOffset = getPageOffset(pageNum);
-    ByteView view = frame.span.subview(pageOffset, PAGE_HEADER_SIZE);
+    PageOffset headerOffset = getHeaderOffset(pageNum);
+    ByteView view = frame.span.subview(headerOffset, PAGE_HEADER_SIZE);
     frame.pageType = view.get<PageType>(offsetof(PageHeader, pageType));
 
     // after CRC32 is implemented, calculate checksum and compare to checksum on page
@@ -81,8 +81,8 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         ASSIGN_OR_RETURN(page, fetchPage((pageNum)));
 
         // reset freespace head
-        PageOffset pageOffset = getPageOffset(page.pageNum());
-        ByteView view = page.subview(pageOffset, sizeof(PageHeader));
+        PageOffset headerOffset = getHeaderOffset(page.pageNum());
+        ByteView view = page.subview(headerOffset, sizeof(PageHeader));
         freespaceHead_ = view.get<PageNum>(offsetof(PageHeader, next));
 
         // re-initialize page
@@ -125,8 +125,8 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     freespaceHead_ = pageNum;
 
     // update page header
-    PageOffset pageOffset = getPageOffset(pageNum);
-    ByteSpan span = page.subspan(pageOffset, sizeof(PageHeader));
+    PageOffset headerOffset = getHeaderOffset(pageNum);
+    ByteSpan span = page.subspan(headerOffset, sizeof(PageHeader));
 
     span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
     span.put<PageNum>(offsetof(PageHeader, next), nextFree);
@@ -255,22 +255,25 @@ DbResult<void> LRUPager::initFile() {
 }
 
 DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {
-    PageOffset pageOffset = getPageOffset(page.pageNum());
+    // calculate header offset and usable size
+    PageOffset headerOffset = getHeaderOffset(page.pageNum());
+    assert(headerOffset < PAGE_SIZE);
+    uint16_t usableSize = PAGE_SIZE - headerOffset;
 
-    // initialize new page header
+    // zero-initialize page
+    page.subspan(headerOffset, usableSize).clear();
+
+    // write new page header
     PageHeader header;
 
     header.pageType = pageType;
-    header.freeOffset = PAGE_HEADER_SIZE + pageOffset;
-
-    // serialize page header
-    ByteSpan pageHeaderSpan = page.subspan(pageOffset, PAGE_HEADER_SIZE);
+    header.freeOffset = PAGE_HEADER_SIZE + headerOffset;
+    ByteSpan pageHeaderSpan = page.subspan(headerOffset, PAGE_HEADER_SIZE);
     pageHeaderSpan.put<PageHeader>(0, header);
 
-    // initialize new page footer
+    // write new page footer
     PageFooter footer;
-
-    // serialize page footer
+    // calculate CRC32 after checksumming is implemented
     ByteSpan pageFooterSpan = page.subspan(PAGE_END_OFFSET, PAGE_FOOTER_SIZE);
     pageFooterSpan.put<PageFooter>(0, footer);
 
@@ -358,7 +361,7 @@ DbResult<void> LRUPager::updateFileHeader() {
     return Ok();
 }
 
-PageOffset LRUPager::getPageOffset(PageNum pageNum) const noexcept {
+PageOffset LRUPager::getHeaderOffset(PageNum pageNum) const noexcept {
     return pageNum == 0 ? PAGE_ZERO_OFFSET : 0;
 }
 

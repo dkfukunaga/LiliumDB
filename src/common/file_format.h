@@ -28,8 +28,8 @@ inline constexpr uint16_t PAGE_HEADER_SIZE = 16;
 inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
 
 // page usable size
-inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_HEADER_SIZE;
-inline constexpr uint16_t PAGE_ZERO_USABLE_SIZE = PAGE_SIZE - FILE_HEADER_SIZE - PAGE_HEADER_SIZE;
+inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_HEADER_SIZE - PAGE_FOOTER_SIZE;
+inline constexpr uint16_t PAGE_ZERO_USABLE_SIZE = PAGE_USABLE_SIZE - FILE_HEADER_SIZE;
 
 // page offsets
 inline constexpr PageOffset PAGE_ZERO_OFFSET = FILE_HEADER_SIZE;
