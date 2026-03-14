@@ -66,6 +66,9 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     ByteView view = frame.span.subview(pageOffset, PAGE_HEADER_SIZE);
     frame.pageType = view.get<PageType>(offsetof(PageHeader, pageType));
 
+    // after CRC32 is implemented, calculate checksum and compare to checksum on page
+    // if different, flag as corrupt and return an error code.
+
     return Ok(PageGuard(this, pageNum, frame.pageType, frame.span));
 }
 
@@ -237,7 +240,6 @@ DbResult<void> LRUPager::initFile() {
     int64_t now = static_cast<int64_t>(std::time(nullptr));
 
     FileHeader header;
-    std::memcpy(header.magicBytes, MAGIC_BYTES, MAGIC_BYTES_LEN);
     header.pageCount = 1;
     header.fileCreated = now;
     header.lastModified = now;
@@ -328,6 +330,9 @@ DbResult<void> LRUPager::flush(PageNum pageNum) {
     Frame& frame = frames_[frameIndex];
 
     if (frame.dirty) {
+        // after CRC32 is implemented, recalculate checksum and write to footer
+        // before writing to disk.
+
         RETURN_ON_ERROR(pageIO_->writePage(pageNum, frame.span));
         frame.dirty = false;
     }
