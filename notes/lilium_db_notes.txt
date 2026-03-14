@@ -129,6 +129,20 @@ WindowsPageIO       — concrete (CreateFile/FlushFileBuffers)
 
 
 
+BTree
+
+interface:
+    - insert(key, value)
+    - lookup(key)
+    - erase(key)
+    - scan(start, end)
+    - min()
+    - max()
+
+
+
+
+
 
 
 
