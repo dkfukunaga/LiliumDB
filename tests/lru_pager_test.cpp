@@ -6,6 +6,7 @@
 #include <fstream>
 #include <ctime>
 #include <string>
+#include <cmath>
 
 #include "gtest/gtest.h"
 
@@ -145,37 +146,77 @@ TEST_F(LRUPagerTest, DeletePage) {
     pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
 
-    // append 3 Table pages (pages 1-3)
-    for (int i = 0; i < 3; ++i) {
+    int sixseven = 0x6767;
+
+    // append 3 Table pages (pages 1-3) with a byte pattern
+    for (int i = 1; i < 4; ++i) {
         auto result = pager->newPage(PageType::Table);
         ASSERT_TRUE(result.isOk());
         auto page = std::move(result.value());
-        ASSERT_EQ(page.pageNum(), 1 + i);
+        ASSERT_EQ(page.pageNum(), i);
         ASSERT_EQ(page.pageType(), PageType::Table);
+
+        // verify header
+        ByteView view = page.view();
+        auto pageType = view.get<PageType>(offsetof(PageHeader, pageType));
+        ASSERT_EQ(pageType, PageType::Table);
+        auto offset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
+        ASSERT_EQ(offset, PAGE_HEADER_SIZE);
+
+        // write byte pattern
+        ByteSpan span = page.span();
+
+        for (int j = 0; j < i*i; ++j) {
+            span.put<int>(offset, sixseven);
+            offset += sizeof(sixseven);
+            if (offset >= PAGE_END_OFFSET) break;
+        }
+
+        // set freespace offset
+        span.put<PageOffset>(offsetof(PageHeader, freeOffset), offset);
     }
 
     // delete page 2
     ASSERT_TRUE(pager->deletePage(2));
 
     // check type of page 2
-    auto pageResult = pager->fetchPage(2);
-    ASSERT_TRUE(pageResult);
-    auto page = std::move(pageResult.value());
-    ByteView view = page.subview(0, PAGE_HEADER_SIZE);
-    PageType pageType = view.get<PageType>(offsetof(PageHeader, pageType));
-    ASSERT_EQ(pageType, PageType::FreeList);
+    {
+        auto pageResult = pager->fetchPage(2);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageType(), PageType::FreeList);
+        ByteView view = page.subview(0, PAGE_HEADER_SIZE);
+        PageType pageType = view.get<PageType>(offsetof(PageHeader, pageType));
+        ASSERT_EQ(pageType, PageType::FreeList);
+    }
 
     // append another page (should reuse page 2)
-    pageResult = pager->newPage(PageType::Index);
-    ASSERT_TRUE(pageResult);
-    page = std::move(pageResult.value());
-    ASSERT_EQ(page.pageNum(), 2);
-    ASSERT_EQ(page.pageType(), PageType::Index);
+    {
+        auto pageResult = pager->newPage(PageType::Index);
+        ASSERT_TRUE(pageResult);
+        auto page = std::move(pageResult.value());
+        ASSERT_EQ(page.pageNum(), 2);
+        ASSERT_EQ(page.pageType(), PageType::Index);
+
+        // confirm page header reset
+        ByteView view = page.view();
+        auto pageType = view.get<PageType>(offsetof(PageHeader, pageType));
+        ASSERT_EQ(pageType, PageType::Index);
+        auto offset = view.get<PageOffset>(offsetof(PageHeader, freeOffset));
+        ASSERT_EQ(offset, PAGE_HEADER_SIZE);
+
+        // confirm useable space has been zeroed
+        uint32_t data;
+        for (int i = offset; i < view.size() - PAGE_FOOTER_SIZE; i += sizeof(data)) {
+            data = view.get<uint32_t>(i);
+                ASSERT_EQ(data, 0);
+        }
+    }
 
     // append another page (should be page 4)
-    pageResult = pager->newPage(PageType::Table);
+    auto pageResult = pager->newPage(PageType::Table);
     ASSERT_TRUE(pageResult);
-    page = std::move(pageResult.value());
+    auto page = std::move(pageResult.value());
     ASSERT_EQ(page.pageNum(), 4);
     ASSERT_EQ(page.pageType(), PageType::Table);
 
@@ -203,9 +244,24 @@ TEST_F(LRUPagerTest, DeletePage) {
     pageResult = pager->fetchPage(0);
     ASSERT_TRUE(pageResult);
     page = std::move(pageResult.value());
-    view = page.subview(0, FILE_HEADER_SIZE);
+    auto view = page.subview(0, FILE_HEADER_SIZE);
     PageNum freespaceHead = view.get<PageNum>(offsetof(FileHeader, freespaceHead));
     ASSERT_EQ(freespaceHead, 4);
+
+    // hexdump to a text file to manually inspect
+    auto now = std::time(nullptr);
+    std::string hexdumpFileName = "../../../../debug/hexdump_" + std::to_string(now) + ".hex";
+    std::ofstream hexdumpFile(hexdumpFileName);
+
+    hexdumpFile << path << "\n\n";
+
+    for (int i = 0; i < 5; ++i) {
+        auto r = pager->fetchPage(i);
+        ASSERT_TRUE(r);
+        auto page = std::move(r.value());
+
+        hexdump(hexdumpFile, page.view(), i * PAGE_SIZE, "Page " + std::to_string(i));
+    }
 
     // page goes out of scope and should unpin page
     // pager goes out of scope and should close without error
@@ -220,7 +276,7 @@ TEST_F(LRUPagerTest, PageEviction) {
     
     // byte patterns for testing
     uint64_t garbage = 0xEFCDAB8967452301;
-    int sixseven = 0xFECA6767;
+    int sixseven = 0x6767;
     const char* song =
         "This is the song that doesn't end\n"
         "Yes, it goes on and on, my friend\n"
@@ -262,8 +318,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_EQ(page.pageType(), PageType::Index);
     }
 
-    // append 11 Table pages with a known byte pattern for verification
-    for (int i = 2; i < 13; ++i) {
+    // append 9 Table pages with a known byte pattern for verification
+    for (int i = 2; i < 11; ++i) {
         auto r = pager->newPage(PageType::Table);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
@@ -277,9 +333,10 @@ TEST_F(LRUPagerTest, PageEviction) {
         // write byte pattern
         ByteSpan span = page.span();
 
-        for (int j = 0; j < 3 + i*5; ++j) {
+        for (int j = 0; j < static_cast<int>(std::pow(2, i)); ++j) {
             span.put<int>(offset, sixseven);
             offset += sizeof(sixseven);
+            if (offset >= PAGE_END_OFFSET) break;
         }
 
         // set freeOffset
@@ -309,8 +366,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_EQ(page.pageType(), PageType::Index);
     }
 
-    // check pages 2-12 (Table Pages)
-    for (int i = 2; i < 13; ++i) {
+    // check pages 2-10 (Table Pages)
+    for (int i = 2; i < 11; ++i) {
         auto r = pager->fetchPage(i);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
@@ -322,10 +379,11 @@ TEST_F(LRUPagerTest, PageEviction) {
         ByteView view = page.span();
         PageOffset offset = PAGE_HEADER_SIZE;
 
-        for (int j = 0; j < 3 + i*5; ++j) {
+        for (int j = 0; j < static_cast<int>(std::pow(2, i)); ++j) {
             data = view.get<int>(offset);
             ASSERT_EQ(data, sixseven);
             offset += sizeof(data);
+            if (offset >= PAGE_END_OFFSET) break;
         }
 
         // verify freeOffset
@@ -341,7 +399,7 @@ TEST_F(LRUPagerTest, PageEviction) {
 
     hexdumpFile << path << "\n\n";
 
-    for (int i = 0; i < 13; ++i) {
+    for (int i = 0; i < 11; ++i) {
         auto r = pager->fetchPage(i);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
