@@ -7,10 +7,9 @@
 
 namespace LiliumDB {
 
-PageGuard::PageGuard(PinManager* pager, PageNum pageNum, PageType pageType, ByteSpan data)
+PageGuard::PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data)
     : pager_(pager)
     , pageNum_(pageNum)
-    , pageType_(pageType)
     , data_(data)
     , dirty_(false) {
     pager_->pinPage(pageNum);
@@ -19,7 +18,6 @@ PageGuard::PageGuard(PinManager* pager, PageNum pageNum, PageType pageType, Byte
 PageGuard::PageGuard(PageGuard&& other) noexcept
     : pager_(other.pager_)
     , pageNum_(other.pageNum_)
-    , pageType_(other.pageType_)
     , data_(other.data_)
     , dirty_(other.dirty_) {
     // invalidate other PageGuard
@@ -77,7 +75,6 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
         // move ownership from other PageGuard
         pager_      = other.pager_;
         pageNum_    = other.pageNum_;
-        pageType_   = other.pageType_;
         data_       = other.data_;
         dirty_      = other.dirty_;
 
@@ -90,7 +87,6 @@ PageGuard& PageGuard::operator=(PageGuard&& other) noexcept {
 void PageGuard::invalidate() noexcept {
     pager_ = nullptr;
     pageNum_ = INVALID_PAGE;
-    pageType_ = PageType::Invalid;
     data_ = ByteSpan();
     dirty_ = false;
 }

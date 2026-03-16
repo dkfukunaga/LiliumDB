@@ -19,11 +19,10 @@ public:
     PageGuard()
         : pager_(nullptr)
         , pageNum_(INVALID_PAGE)
-        , pageType_(PageType::Invalid)
         , data_()
         , dirty_(false) { }
     /// Pins the given page in the buffer pool.
-    PageGuard(PinManager* pager, PageNum pageNum, PageType pageType, ByteSpan data);
+    PageGuard(PinManager* pager, PageNum pageNum, /*PageType pageType,*/ ByteSpan data);
     PageGuard(const PageGuard&) = delete;
     /// Transfers ownership of the pin; the moved-from guard becomes invalid.
     PageGuard(PageGuard&& other) noexcept;
@@ -41,7 +40,6 @@ public:
     /// ByteView throws std::out_of_range.
     ByteView    subview(PageOffset start, uint16_t len) const;
     PageNum     pageNum() const { return pageNum_; }
-    PageType    pageType() const { return pageType_; }
     /// Invaldates unpins the underlying page and invalidates PageGuard
     void        reset();
 
@@ -53,7 +51,6 @@ public:
 private:
     PinManager* pager_;
     PageNum     pageNum_;
-    PageType    pageType_;
     ByteSpan    data_;
     bool        dirty_;
 

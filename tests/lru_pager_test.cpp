@@ -49,14 +49,17 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
     ASSERT_TRUE(pageResult);
     auto page = std::move(pageResult.value());
     ASSERT_EQ(page.pageNum(), 1);
-    ASSERT_EQ(page.pageType(), PageType::Table);
+    // check page type
+    auto header = page.view().get<PageHeader>(0);
+    ASSERT_EQ(header.pageType, PageType::Table);
 
     // append an Index page (should be page 2)
     pageResult = pager->newPage(PageType::Index);
     ASSERT_TRUE(pageResult);
     page = std::move(pageResult.value());
-    ASSERT_EQ(page.pageNum(), 2);
-    ASSERT_EQ(page.pageType(), PageType::Index);
+    // check page type
+    header = page.view().get<PageHeader>(0);
+    ASSERT_EQ(header.pageType, PageType::Index);
 
     // append 4 Table pages
     for (int i = 0; i < 4; ++i) {
@@ -64,7 +67,6 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
         ASSERT_TRUE(result.isOk());
         auto page = std::move(result.value());
         ASSERT_EQ(page.pageNum(), 3 + i);
-        ASSERT_EQ(page.pageType(), PageType::Table);
     }
 
     // attempt to fetch a page out of range
@@ -82,11 +84,11 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
 
     // verify header
     ByteView headerView = page.subview(PAGE_ZERO_OFFSET, sizeof(PageHeader));
-    PageHeader header = headerView.get<PageHeader>(0);
+    header = headerView.get<PageHeader>(0);
 
     ASSERT_EQ(header.pageType, PageType::Table);
     ASSERT_EQ(header.pageFlags, PageFlags());
-    ASSERT_EQ(header.level, INVALID_PAGE_LEVEL);
+    ASSERT_EQ(header.treeLevel, INVALID_TREE_LEVEL);
     ASSERT_EQ(header.slotCount, 0);
     ASSERT_EQ(header.freeOffset, PAGE_ZERO_OFFSET + PAGE_HEADER_SIZE);
     ASSERT_EQ(header.next, INVALID_PAGE);
@@ -114,28 +116,34 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
         ASSERT_TRUE(pageResult);
         auto readPage = std::move(pageResult.value());
         ASSERT_EQ(readPage.pageNum(), 0);
-        ASSERT_EQ(readPage.pageType(), PageType::Table);
+        // check page type
+        auto header = readPage.view().get<PageHeader>(PAGE_ZERO_OFFSET);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // check page 1
         pageResult = readPager->fetchPage(1);
         ASSERT_TRUE(pageResult);
         readPage = std::move(pageResult.value());
         ASSERT_EQ(readPage.pageNum(), 1);
-        ASSERT_EQ(readPage.pageType(), PageType::Table);
+        // check page type
+        header = readPage.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // check page 2
         pageResult = readPager->fetchPage(2);
         ASSERT_TRUE(pageResult);
         readPage = std::move(pageResult.value());
         ASSERT_EQ(readPage.pageNum(), 2);
-        ASSERT_EQ(readPage.pageType(), PageType::Index);
+        header = readPage.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Index);
 
         // check page 6
         pageResult = readPager->fetchPage(6);
         ASSERT_TRUE(pageResult);
         readPage = std::move(pageResult.value());
         ASSERT_EQ(readPage.pageNum(), 6);
-        ASSERT_EQ(readPage.pageType(), PageType::Table);
+        header = readPage.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Table);
     }
     // pager goes out of scope and should close without error
 }
@@ -154,7 +162,8 @@ TEST_F(LRUPagerTest, DeletePage) {
         ASSERT_TRUE(result.isOk());
         auto page = std::move(result.value());
         ASSERT_EQ(page.pageNum(), i);
-        ASSERT_EQ(page.pageType(), PageType::Table);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // verify header
         ByteView view = page.view();
@@ -184,10 +193,8 @@ TEST_F(LRUPagerTest, DeletePage) {
         auto pageResult = pager->fetchPage(2);
         ASSERT_TRUE(pageResult);
         auto page = std::move(pageResult.value());
-        ASSERT_EQ(page.pageType(), PageType::FreeList);
-        ByteView view = page.subview(0, PAGE_HEADER_SIZE);
-        PageType pageType = view.get<PageType>(offsetof(PageHeader, pageType));
-        ASSERT_EQ(pageType, PageType::FreeList);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::FreeList);
     }
 
     // append another page (should reuse page 2)
@@ -196,7 +203,8 @@ TEST_F(LRUPagerTest, DeletePage) {
         ASSERT_TRUE(pageResult);
         auto page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 2);
-        ASSERT_EQ(page.pageType(), PageType::Index);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Index);
 
         // confirm page header reset
         ByteView view = page.view();
@@ -218,7 +226,8 @@ TEST_F(LRUPagerTest, DeletePage) {
     ASSERT_TRUE(pageResult);
     auto page = std::move(pageResult.value());
     ASSERT_EQ(page.pageNum(), 5);
-    ASSERT_EQ(page.pageType(), PageType::Table);
+    auto header = page.view().get<PageHeader>(0);
+    ASSERT_EQ(header.pageType, PageType::Table);
 
     // delete page 4 for manual inspection
     // should return InvalidArg error if PageGuard is still in scope
@@ -308,7 +317,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(pageResult);
         auto page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 0);
-        ASSERT_EQ(page.pageType(), PageType::Table);
+        auto header = page.view().get<PageHeader>(PAGE_ZERO_OFFSET);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // get freeOffset
         ByteView view = page.subview(FILE_HEADER_SIZE, PAGE_HEADER_SIZE);
@@ -333,7 +343,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(pageResult);
         auto page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 1);
-        ASSERT_EQ(page.pageType(), PageType::Index);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Index);
     }
 
     // append 9 Table pages with a known byte pattern for verification
@@ -342,7 +353,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
         ASSERT_EQ(page.pageNum(), i);
-        ASSERT_EQ(page.pageType(), PageType::Table);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // get freeOffset
         ByteView view = page.subview(0, PAGE_HEADER_SIZE);
@@ -368,7 +380,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(pageResult);
         auto page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 0);
-        ASSERT_EQ(page.pageType(), PageType::Table);
+        auto header = page.view().get<PageHeader>(PAGE_ZERO_OFFSET);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // check garbage bytes
         ByteView view = page.subview(FILE_HEADER_SIZE, PAGE_ZERO_USABLE_SIZE);
@@ -381,7 +394,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(pageResult);
         page = std::move(pageResult.value());
         ASSERT_EQ(page.pageNum(), 1);
-        ASSERT_EQ(page.pageType(), PageType::Index);
+        header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Index);
     }
 
     // check pages 2-10 (Table Pages)
@@ -390,7 +404,8 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
         ASSERT_EQ(page.pageNum(), i);
-        ASSERT_EQ(page.pageType(), PageType::Table);
+        auto header = page.view().get<PageHeader>(0);
+        ASSERT_EQ(header.pageType, PageType::Table);
 
         // verify byte pattern
         int data;

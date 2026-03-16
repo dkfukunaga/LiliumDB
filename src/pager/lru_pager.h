@@ -46,17 +46,10 @@ private:
     using FrameIter = std::list<FrameIndex>::iterator;
 
     struct Frame {
-        ByteSpan    span;                           // points into pool_ at frame offset
         PageNum     pageNum  = INVALID_PAGE;        // which page is loaded, INVALID_PAGE if empty
-        PageType    pageType = PageType::Invalid;   // Invalid if empty or uninitialized
         uint32_t    pinCount = 0;                   // count of PageGuards accessing page
         bool        dirty    = false;               // flush on eviction if dirty
-
-        Frame() = default;
-        Frame(std::vector<uint8_t>& dat, FrameIndex idx, PageNum pn, PageType pt)
-            : span(ByteSpan(&dat.data()[idx * PAGE_SIZE], PAGE_SIZE))
-            , pageNum(pn)
-            , pageType(pt) { }
+        ByteSpan    span;                           // points into pool_ at frame offset
     };
 
     std::unique_ptr<PageIO> pageIO_;
@@ -81,7 +74,11 @@ private:
         : pageIO_(std::move(pageIO))
         , openMode_(mode)
         , pool_(poolSize * PAGE_SIZE)
-        , frames_(poolSize) { }
+        , frames_(poolSize) {
+        for (size_t i = 0; i < poolSize; ++i) {
+            frames_[i].span = ByteSpan(&pool_.data()[i * PAGE_SIZE], PAGE_SIZE);
+        }
+    }
 
     DbResult<void>          validateFileHeader();
     DbResult<void>          initFile();

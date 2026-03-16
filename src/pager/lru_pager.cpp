@@ -52,7 +52,7 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
         lruList_.splice(lruList_.begin(), lruList_, frameIter);
         Frame& frame = frames_[*frameIter];
 
-        return Ok(PageGuard(this, pageNum, frame.pageType, frame.span));
+        return Ok(PageGuard(this, pageNum, frame.span));
     }
 
     // else, allocate a new frame and read page from disk
@@ -61,15 +61,10 @@ DbResult<PageGuard> LRUPager::fetchPage(PageNum pageNum) {
     Frame& frame = frames_[frameIndex];
     RETURN_ON_ERROR(pageIO_->readPage(pageNum, frame.span));
 
-    // read page type and set in Frame
-    PageOffset headerOffset = getHeaderOffset(pageNum);
-    ByteView view = frame.span.subview(headerOffset, PAGE_HEADER_SIZE);
-    frame.pageType = view.get<PageType>(offsetof(PageHeader, pageType));
-
     // after CRC32 is implemented, calculate checksum and compare to checksum on page
     // if different, flag as corrupt and return an error code.
 
-    return Ok(PageGuard(this, pageNum, frame.pageType, frame.span));
+    return Ok(PageGuard(this, pageNum, frame.span));
 }
 
 DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
@@ -97,7 +92,7 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         Frame& frame = frames_[index];
 
         // contruct PageGuard to send to initPage
-        page = PageGuard(this, pageNum, pageType, frame.span);
+        page = PageGuard(this, pageNum, frame.span);
         ASSIGN_OR_RETURN(page, initPage(std::move(page), pageType));
     }
 
@@ -131,9 +126,6 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
     span.put<PageNum>(offsetof(PageHeader, next), nextFree);
 
-    // update frame
-    frame.pageType = PageType::FreeList;
-
     return Ok();
 }
 
@@ -150,16 +142,12 @@ DbResult<void> LRUPager::flushPage(PageNum pageNum) {
 }
 
 DbResult<void> LRUPager::flushAll() {
-    if (highestAllocated_ == INVALID_PAGE) {
-        RETURN_ON_ERROR(flush(0));
-    } else {
-        RETURN_ON_ERROR(updateFileHeader());
-        for (PageNum i = 0; i <= highestAllocated_; ++i) {
-            if (pageMap_.find(i) != pageMap_.end()) {
-                RETURN_ON_ERROR(flush(i));
-                if (i == appendStart_) {
-                    ++appendStart_;
-                }
+    RETURN_ON_ERROR(updateFileHeader());
+    for (PageNum i = 0; i <= highestAllocated_; ++i) {
+        if (pageMap_.find(i) != pageMap_.end()) {
+            RETURN_ON_ERROR(flush(i));
+            if (i == appendStart_) {
+                ++appendStart_;
             }
         }
     }
@@ -227,10 +215,8 @@ DbResult<void> LRUPager::initFile() {
     highestAllocated_ = 0;
     freespaceHead_ = INVALID_PAGE;
 
-    // allocate new page zero and set to PageType::Table
-    FrameIndex index;
-    ASSIGN_OR_RETURN(index, allocateFrame(0));
-    frames_[index].pageType = PageType::Table;
+    // allocate new page zero
+    RETURN_ON_ERROR(allocateFrame(0));
 
     // get PageGuard for page 0
     PageGuard page;
@@ -245,8 +231,7 @@ DbResult<void> LRUPager::initFile() {
     header.lastModified = now;
 
     // serialize header
-    ByteSpan headerSpan = page.subspan(0, sizeof(FileHeader));
-    headerSpan.put<FileHeader>(0, header);
+    page.span().put<FileHeader>(0, header);
 
     // initialize page 0 to a Table page
     RETURN_ON_ERROR(initPage(std::move(page), PageType::Table));
@@ -268,20 +253,14 @@ DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {
 
     header.pageType = pageType;
     header.freeOffset = PAGE_HEADER_SIZE + headerOffset;
-    ByteSpan pageHeaderSpan = page.subspan(headerOffset, PAGE_HEADER_SIZE);
-    pageHeaderSpan.put<PageHeader>(0, header);
+    page.span().put<PageHeader>(headerOffset, header);
 
     // write new page footer
     PageFooter footer;
     // calculate CRC32 after checksumming is implemented
-    ByteSpan pageFooterSpan = page.subspan(PAGE_END_OFFSET, PAGE_FOOTER_SIZE);
-    pageFooterSpan.put<PageFooter>(0, footer);
+    page.span().put<PageFooter>(PAGE_END_OFFSET, footer);
 
-    // set page type in Frame and PageGuard
-    Frame& frame = frames_[*pageMap_[page.pageNum()]];
-    frame.pageType = pageType;
-
-    return Ok(PageGuard(this, frame.pageNum, frame.pageType, frame.span));
+    return Ok(std::move(page));
 }
 
 DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
@@ -292,7 +271,8 @@ DbResult<LRUPager::FrameIndex> LRUPager::allocateFrame(PageNum pageNum) {
         ASSIGN_OR_RETURN(index, evictLastUsedPage());
     }
 
-    frames_[index] = Frame(pool_, index, pageNum, PageType::Invalid);
+    frames_[index].pageNum = pageNum;
+
     auto iter = lruList_.emplace(lruList_.begin(), index);
     pageMap_.insert({pageNum, iter});
 
