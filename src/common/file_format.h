@@ -72,7 +72,7 @@ enum class PageFlag : uint8_t {
     Corrupt  = 0x01,
 };
 
-inline constexpr uint8_t INVALID_PAGE_LEVEL = std::numeric_limits<uint8_t>::max();
+inline constexpr uint8_t INVALID_TREE_LEVEL = std::numeric_limits<uint8_t>::max();
 inline constexpr PageOffset INVALID_PAGE_OFFSET = std::numeric_limits<PageOffset>::max();
 
 using PageFlags = Flags<PageFlag>;
@@ -80,11 +80,11 @@ using PageFlags = Flags<PageFlag>;
 struct PageHeader {
     PageType    pageType = PageType::Invalid;
     PageFlags   pageFlags = PageFlags();
-    uint8_t     level = INVALID_PAGE_LEVEL;         // for B+ tree - 0 indicates leaf page
-    uint8_t     reserved = 0;                       // reserved for fragmentCount in RecordStore (future)
-    uint16_t    slotCount = 0;                      // used by RecordStore
-    PageOffset  freeOffset = INVALID_PAGE_OFFSET;   // used by RecordStore
-    PageNum     next = INVALID_PAGE;                // right child for B+ tree branch pages
+    uint8_t     treeLevel = INVALID_TREE_LEVEL;     // for B+ tree - 0 indicates leaf page
+    uint8_t     reserved = 0;                       // reserved for fragmentCount (future)
+    uint16_t    slotCount = 0;
+    PageOffset  freeOffset = INVALID_PAGE_OFFSET;
+    PageNum     next = INVALID_PAGE;                // right child for B+ tree internal pages
     PageNum     prev = INVALID_PAGE;
 };
 
