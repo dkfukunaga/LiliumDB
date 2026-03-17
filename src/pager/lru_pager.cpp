@@ -76,8 +76,8 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         ASSIGN_OR_RETURN(page, fetchPage((pageNum)));
 
         // reset freespace head
-        ByteView view = page.pageView();
-        freespaceHead_ = view.get<PageNum>(offsetof(PageHeader, next));
+        auto header = page.getHeader();
+        freespaceHead_ = header.next;
 
         // re-initialize page
         ASSIGN_OR_RETURN(page, initPage(std::move(page), pageType));
@@ -119,10 +119,12 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     freespaceHead_ = pageNum;
 
     // update page header
-    ByteSpan span = page.pageSpan();
+    auto header = page.getHeader();
 
-    span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
-    span.put<PageNum>(offsetof(PageHeader, next), nextFree);
+    header.pageType = PageType::FreeList;
+    header.next = nextFree;
+
+    page.setHeader(header);
 
     return Ok();
 }
@@ -238,14 +240,15 @@ DbResult<void> LRUPager::initFile() {
 }
 
 DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {// zero-initialize page
-    page.pageSpan().clear();
+    auto offset = page.pageOffset();
+    page.subspan(offset, PAGE_SIZE - offset).clear();
 
     // write new page header
     PageHeader header;
 
     header.pageType = pageType;
     header.freeOffset = PAGE_HEADER_SIZE + page.pageOffset();
-    page.pageSpan().put<PageHeader>(0, header);
+    page.setHeader(header);
 
     // write new page footer
     PageFooter footer;
