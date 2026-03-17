@@ -87,7 +87,6 @@ private:
     DbResult<FrameIndex>    evictLastUsedPage();
     DbResult<void>          flush(PageNum pageNum);
     DbResult<void>          updateFileHeader();
-    PageOffset              getHeaderOffset(PageNum pageNum) const noexcept;
 };
 
 } // namespace LiliumDB

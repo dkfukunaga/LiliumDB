@@ -34,12 +34,17 @@ public:
     /// Returns a mutable span over a region the page data and marks the page dirty.
     /// ByteSpan throws std::out_of_range.
     ByteSpan    subspan(PageOffset start, uint16_t len);
+    /// Returns a mutable span over the usable page data and marks the page dirty.
+    ByteSpan    pageSpan();
     /// Returns a read-only view over the page data.
     ByteView    view() const;
     /// Returns a read-only view over a region the page data.
     /// ByteView throws std::out_of_range.
     ByteView    subview(PageOffset start, uint16_t len) const;
-    PageNum     pageNum() const { return pageNum_; }
+    /// Returns a mutable read-only view over the usable page data and marks the page dirty.
+    ByteView    pageView() const;
+    PageNum     pageNum() const noexcept { return pageNum_; }
+    PageOffset  pageOffset() const noexcept { return pageNum_ == 0 ? PAGE_ZERO_OFFSET : 0; }
     /// Invaldates unpins the underlying page and invalidates PageGuard
     void        reset();
 

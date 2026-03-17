@@ -48,6 +48,11 @@ ByteSpan PageGuard::subspan(PageOffset start, uint16_t len) {
     return data_.subspan(start, len);
 }
 
+ByteSpan PageGuard::pageSpan() {
+    PageOffset offset = pageOffset();
+    return subspan(offset, PAGE_SIZE - offset);
+}
+
 ByteView PageGuard::view() const {
     assert(pager_ && "Cannot access page data from an invalid PageGuard");
     return ByteView(data_);
@@ -56,6 +61,11 @@ ByteView PageGuard::view() const {
 ByteView PageGuard::subview(PageOffset start, uint16_t len) const {
     assert(pager_ && "Cannot access page data from an invalid PageGuard");
     return data_.subview(start, len);
+}
+
+ByteView PageGuard::pageView() const {
+    PageOffset offset = pageOffset();
+    return subview(offset, PAGE_SIZE - offset);
 }
 
 void PageGuard::reset() {

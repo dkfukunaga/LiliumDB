@@ -76,8 +76,7 @@ DbResult<PageGuard> LRUPager::newPage(PageType pageType) {
         ASSIGN_OR_RETURN(page, fetchPage((pageNum)));
 
         // reset freespace head
-        PageOffset headerOffset = getHeaderOffset(page.pageNum());
-        ByteView view = page.subview(headerOffset, sizeof(PageHeader));
+        ByteView view = page.pageView();
         freespaceHead_ = view.get<PageNum>(offsetof(PageHeader, next));
 
         // re-initialize page
@@ -120,8 +119,7 @@ DbResult<void> LRUPager::deletePage(PageNum pageNum) {
     freespaceHead_ = pageNum;
 
     // update page header
-    PageOffset headerOffset = getHeaderOffset(pageNum);
-    ByteSpan span = page.subspan(headerOffset, sizeof(PageHeader));
+    ByteSpan span = page.pageSpan();
 
     span.put<PageType>(offsetof(PageHeader, pageType), PageType::FreeList);
     span.put<PageNum>(offsetof(PageHeader, next), nextFree);
@@ -239,21 +237,15 @@ DbResult<void> LRUPager::initFile() {
     return Ok();
 }
 
-DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {
-    // calculate header offset and usable size
-    PageOffset headerOffset = getHeaderOffset(page.pageNum());
-    assert(headerOffset < PAGE_SIZE);
-    uint16_t usableSize = PAGE_SIZE - headerOffset;
-
-    // zero-initialize page
-    page.subspan(headerOffset, usableSize).clear();
+DbResult<PageGuard> LRUPager::initPage(PageGuard&& page, PageType pageType) {// zero-initialize page
+    page.pageSpan().clear();
 
     // write new page header
     PageHeader header;
 
     header.pageType = pageType;
-    header.freeOffset = PAGE_HEADER_SIZE + headerOffset;
-    page.span().put<PageHeader>(headerOffset, header);
+    header.freeOffset = PAGE_HEADER_SIZE + page.pageOffset();
+    page.pageSpan().put<PageHeader>(0, header);
 
     // write new page footer
     PageFooter footer;
@@ -339,10 +331,6 @@ DbResult<void> LRUPager::updateFileHeader() {
     // headerSpan.put<uint32_t>(offsetof(FileHeader, checksum), CHECKSUM_PLACEHOLDER);
 
     return Ok();
-}
-
-PageOffset LRUPager::getHeaderOffset(PageNum pageNum) const noexcept {
-    return pageNum == 0 ? PAGE_ZERO_OFFSET : 0;
 }
 
 } // namespace LiliumDB
