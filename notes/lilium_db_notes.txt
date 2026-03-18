@@ -133,11 +133,10 @@ BTree
 
 interface:
     - insert(key, value)
-    - lookup(key)
-    - erase(key)
-    - scan(start, end)
-    - min()
-    - max()
+    - remove(key)
+    - scan(key)
+    - first()
+    - last()
 
 
 
