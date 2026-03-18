@@ -12,4 +12,5 @@ target_compile_options(liliumdb_lib PRIVATE
 
 add_subdirectory(storage)
 add_subdirectory(pager)
+add_subdirectory(btree)
 add_subdirectory(utils)
