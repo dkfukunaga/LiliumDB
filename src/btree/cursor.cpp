@@ -30,7 +30,7 @@ DbResult<void> Cursor::next() {
 
     if (header.slotCount > 0 && slot_ < header.slotCount - 1) {
         slot_++;
-    } else {
+    } else { // at last slot of the page
         if (header.next == INVALID_PAGE) {
             invalidate();
         } else {
@@ -53,7 +53,7 @@ DbResult<void> Cursor::prev() {
 
     if (slot_ > 0) {
         slot_--;
-    } else {
+    } else { // at first slot of the page
         if (header.prev == INVALID_PAGE) {
             invalidate();
         } else {

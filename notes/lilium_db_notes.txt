@@ -139,6 +139,30 @@ interface:
     - last()
 
 
+test cases:
+
+Splitting:
+- Fill a leaf until it forces a split, verify both resulting pages are valid and keys are ordered correctly
+- Fill enough to force a root split specifically, verify tree height increases
+- Variable sized records to ensure the size-based split point works correctly, not just entry count
+
+Merging/redistribution:
+- Delete enough records to trigger underflow, verify merge or redistribution occurs
+- Test the case where the sibling can spare entries (redistribution) vs where it can't (merge)
+- Delete down to a single entry in the root, verify tree height decreases
+
+Cursor:
+- Seek to a key that exists, verify key() and value() match
+- Seek to a key between two existing keys, verify lower bound lands on the correct entry
+- Seek past the last key, verify cursor is invalid
+- Walk forward through all entries, verify key order is ascending
+- Walk backward, verify descending
+
+Edge cases:
+- Empty tree insert and seek
+- Single entry tree
+- Duplicate seek attempts on the same key
+
 
 
 
