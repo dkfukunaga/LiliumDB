@@ -1,12 +1,18 @@
 #ifndef LILIUMDB_BTREE_TYPES_H
 #define LILIUMDB_BTREE_TYPES_H
 
+#include <limits>
+
 #include "common/types.h"
 #include "common/file_format.h"
 #include "utils/byte_span.h"
 #include "pager/page_guard.h"
 
 namespace LiliumDB {
+
+using SlotIndex = uint16_t;
+
+inline constexpr SlotIndex INVALID_SLOT = std::numeric_limits<SlotIndex>::max();
 
 inline constexpr uint16_t SLOT_SIZE = 4;
 inline constexpr uint16_t KEY_HEADER_SIZE = 6;
@@ -40,6 +46,9 @@ static_assert(sizeof(KeyValueHeader) == KEY_VALUE_HEADER_SIZE);
 
 inline PageOffset slotOffset(SlotIndex index) noexcept {
     return static_cast<PageOffset>(PAGE_END_OFFSET - (index + 1) * sizeof(Slot));
+}
+inline PageOffset slotOffset(int index) noexcept {
+    return slotOffset(static_cast<SlotIndex>(index));
 }
 
 ByteView getKey(const PageGuard& page, SlotIndex index);
