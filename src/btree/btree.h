@@ -30,22 +30,39 @@ private:
     PageNum root_;
 
     DbResult<ParentStack> leafSearch(ByteView key) const;
+    uint16_t compact(PageGuard& page);
+
     void insertIntoLeaf(
         PageGuard& page,
         SlotIndex index,
         ByteView key,
         ByteView value);
-    void insertIntoInternal(
+    void insertIntoInner(
         PageGuard& page,
         SlotIndex index,
         ByteView key,
         PageNum child);
+
     DbResult<void> splitAndInsert(
         PageGuard page,
-        SlotIndex index,
         ParentStack&& stack,
+        SlotIndex index,
         ByteView key,
         ByteView value);
+    DbResult<std::vector<uint8_t>> splitLeaf(
+        PageGuard page,
+        SlotIndex index,
+        ByteView key,
+        ByteView value);
+    DbResult<std::vector<uint8_t>> splitInner(
+        PageGuard page,
+        SlotIndex index,
+        ByteView key,
+        PageNum child);
+
+    DbResult<void> mergeOrRedistribute(PageGuard page, ParentStack&& stack);
+    DbResult<std::vector<uint8_t>> mergeLeaf(PageGuard page);
+    DbResult<std::vector<uint8_t>> mergeInner(PageGuard page);
 
 };
 
