@@ -2,6 +2,7 @@
 #define LILIUMDB_FILE_FORMAT_H
 
 #include <cstdint>
+#include <cmath>
 
 #include "types.h"
 #include "utils/flags.h"
@@ -27,9 +28,11 @@ inline constexpr uint16_t FILE_HEADER_SIZE = 64;
 inline constexpr uint16_t PAGE_HEADER_SIZE = 16;
 inline constexpr uint16_t PAGE_FOOTER_SIZE = 4;
 
-// page usable size
+// page usable size and minimum occupancy
 inline constexpr uint16_t PAGE_USABLE_SIZE = PAGE_SIZE - PAGE_HEADER_SIZE - PAGE_FOOTER_SIZE;
 inline constexpr uint16_t PAGE_ZERO_USABLE_SIZE = PAGE_USABLE_SIZE - FILE_HEADER_SIZE;
+inline constexpr uint16_t PAGE_MIN_OCCUPANCY = std::ceil(PAGE_USABLE_SIZE / 2);
+inline constexpr uint16_t PAGE_ZERO_MIN_OCCUPANCY = std::ceil(PAGE_ZERO_USABLE_SIZE / 2);
 
 // page offsets
 inline constexpr PageOffset PAGE_ZERO_OFFSET = FILE_HEADER_SIZE;
