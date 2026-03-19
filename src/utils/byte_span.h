@@ -7,6 +7,7 @@
 #include <stdexcept>    // std::out_of_range
 #include <cassert>      // assert
 #include <iterator>     // std::reverse_iterator
+#include <vector>
 
 namespace LiliumDB {
 
@@ -21,6 +22,7 @@ public:
     constexpr ByteSpan(uint8_t* bytes, size_t size): data_(bytes), size_(size) {
         assert(data_ != nullptr || size_ == 0);
     }
+    explicit ByteSpan(std::vector<uint8_t>& vec) : data_(vec.data()), size_(vec.size()) { }
 
     constexpr uint8_t&                  at(size_t offset);
     [[nodiscard]] constexpr ByteSpan    subspan(size_t start, size_t len);
@@ -30,6 +32,7 @@ public:
     template <class T> void             put(size_t start, const T& value);
     // Copies len bytes from src into this span starting at start.
     void                                write(size_t start, const uint8_t* src, size_t len);
+    void                                write(size_t start, const ByteView& src);
     // Copies len bytes within this span from [from, from+len) to [to, to+len).
     // Safe for overlapping regions.
     void                                copy_within(size_t to, size_t from, size_t len);
@@ -78,6 +81,7 @@ public:
         assert(data_ != nullptr || size_ == 0);
     }
     constexpr ByteView(const ByteSpan& span): data_(span.data()), size_(span.size()) { }
+    explicit ByteView(const std::vector<uint8_t>& vec) : data_(vec.data()), size_(vec.size()) { }
 
     constexpr uint8_t                   at(size_t offset) const;
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
@@ -148,6 +152,10 @@ inline void ByteSpan::write(size_t start, const uint8_t* src, size_t len) {
         std::memcpy(data_ + start, src, len);
     else
         throw std::out_of_range("destination out of range");
+}
+
+inline void ByteSpan::write(size_t start, const ByteView& src) {
+    write(start, src.data(), src.size());
 }
 
 inline void ByteSpan::copy_within(size_t to, size_t from, size_t len) {
