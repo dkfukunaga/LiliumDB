@@ -44,6 +44,7 @@ public:
     void        setHeader(PageHeader header);
     PageNum     pageNum() const noexcept { return pageNum_; }
     PageOffset  pageOffset() const noexcept { return pageNum_ == 0 ? PAGE_ZERO_OFFSET : 0; }
+    PageOffset  usableStart() const noexcept { return pageOffset() + sizeof(PageHeader); }
     /// Invaldates unpins the underlying page and invalidates PageGuard
     void        reset();
 
