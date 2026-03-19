@@ -11,10 +11,11 @@ namespace LiliumDB {
 
 class Cursor {
 public:
-    Cursor(Pager& pager, PageGuard page, SlotIndex slot)
+    Cursor(Pager* pager, PageGuard page, SlotIndex slot)
         : pager_(pager)
         , page_(std::move(page))
         , slot_(slot) { }
+    Cursor() : pager_(nullptr), page_(PageGuard()), slot_(INVALID_SLOT), valid_(false) { }
     Cursor(const Cursor&) = delete;
     Cursor(Cursor&& other) noexcept;
     ~Cursor() = default;
@@ -27,7 +28,7 @@ public:
     DbResult<void>  prev();
 
 private:
-    Pager&      pager_;
+    Pager*      pager_;
     PageGuard   page_;
     SlotIndex   slot_;
     bool        valid_;

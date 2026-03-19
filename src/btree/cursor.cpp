@@ -6,6 +6,7 @@ Cursor::Cursor(Cursor&& other) noexcept
     : pager_(other.pager_)
     , page_(std::move(other.page_))
     , slot_(other.slot_) {
+    other.pager_ = nullptr;
     other.invalidate();
 }
 
@@ -34,7 +35,7 @@ DbResult<void> Cursor::next() {
         if (header.next == INVALID_PAGE) {
             invalidate();
         } else {
-            ASSIGN_OR_RETURN(page_, pager_.fetchPage(header.next));
+            ASSIGN_OR_RETURN(page_, pager_->fetchPage(header.next));
             header = page_.getHeader();
 
             if (header.slotCount == 0) {
@@ -57,7 +58,7 @@ DbResult<void> Cursor::prev() {
         if (header.prev == INVALID_PAGE) {
             invalidate();
         } else {
-            ASSIGN_OR_RETURN(page_, pager_.fetchPage(header.prev));
+            ASSIGN_OR_RETURN(page_, pager_->fetchPage(header.prev));
             header = page_.getHeader();
 
             if (header.slotCount == 0) {
