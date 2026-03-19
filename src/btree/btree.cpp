@@ -60,15 +60,41 @@ DbResult<Cursor> BTree::seek(ByteView key) {
     PagePosition pagePosition = std::move(stack.back());
     stack.pop_back();
 
-    return Ok(Cursor(pager_, std::move(pagePosition.page), pagePosition.slot));
+    return Ok(Cursor(&pager_, std::move(pagePosition.page), pagePosition.slot));
 }
 
 DbResult<Cursor> BTree::first() {
-    
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, pager_.fetchPage(root_));
+    auto header = page.getHeader();
+
+    if (header.slotCount == 0) {
+        return Ok(Cursor()); // invalid cursor
+    }
+
+    while (header.treeLevel > 0) {
+        ASSIGN_OR_RETURN(page, pager_.fetchPage(getChild(page, 0)));
+        header = page.getHeader();
+    }
+
+    return Ok(Cursor(&pager_, std::move(page), 0));
 }
 
 DbResult<Cursor> BTree::last() {
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, pager_.fetchPage(root_));
+    auto header = page.getHeader();
 
+    if (header.slotCount == 0) {
+        return Ok(Cursor()); // invalid cursor
+    }
+
+    while (header.treeLevel > 0) {
+        ASSIGN_OR_RETURN(page, pager_.fetchPage(header.next));
+        header = page.getHeader();
+    }
+
+    return Ok(Cursor(&pager_, std::move(page), header.slotCount - 1));
 }
 
 DbResult<BTree::ParentStack> BTree::leafSearch(ByteView key) const {
