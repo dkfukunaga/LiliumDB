@@ -2,30 +2,6 @@
 
 namespace LiliumDB {
 
-Cursor::Cursor(Cursor&& other) noexcept
-    : pager_(other.pager_)
-    , page_(std::move(other.page_))
-    , slot_(other.slot_) {
-    other.pager_ = nullptr;
-    other.invalidate();
-}
-
-ByteView Cursor::key() const {
-    assert(valid_);
-    if (!valid_) {
-        return ByteView();
-    }
-    return getKey(page_, slot_);
-}
-
-ByteView Cursor::value() const {
-    assert(valid_);
-    if (!valid_) {
-        return ByteView();
-    }
-    return getValue(page_, slot_);
-}
-
 DbResult<void> Cursor::next() {
     PageHeader header = page_.getHeader();
 
