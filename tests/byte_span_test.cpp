@@ -116,6 +116,14 @@ TEST(ByteViewTest, Iterators) {
     EXPECT_EQ(reverse_collected, std::vector<uint8_t>({255, 200, 100}));
 }
 
+TEST(ByteViewTest, GetAsVector) {
+    std::vector<uint8_t> data = {1, 2, 3, 4, 5};
+    ByteView view(data.data(), data.size());
+
+    auto vec = view.readAsVector(1, 3);
+    EXPECT_EQ(vec, std::vector<uint8_t>({2, 3, 4}));
+}
+
 struct TestHeader {
     uint16_t id;
     uint32_t offset;

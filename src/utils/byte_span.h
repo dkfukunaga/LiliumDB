@@ -85,6 +85,7 @@ public:
 
     constexpr uint8_t                   at(size_t offset) const;
     [[nodiscard]] constexpr ByteView    subview(size_t start, size_t len) const;
+    std::vector<uint8_t>                toVector() const;
 
     // Reads sizeof(T) bytes at start from this view and returns as T. Throws if out of range.
     template <class T> T                get(size_t start) const;
@@ -92,6 +93,7 @@ public:
     template <class T> void             get(size_t start, T& dst) const;
     // Copies len bytes from this view into dst starting at start.
     void                                read(size_t start, uint8_t* dst, size_t len) const;
+    std::vector<uint8_t>                readAsVector(size_t start, size_t len) const;
 
     constexpr const uint8_t*            data() const noexcept { return data_; }
     constexpr size_t                    size() const noexcept { return size_; }
@@ -181,6 +183,10 @@ constexpr ByteView ByteView::subview(size_t start, size_t len) const {
         throw std::out_of_range("subview out of range");
 }
 
+inline std::vector<uint8_t> ByteView::toVector() const {
+    return readAsVector(0, size_);
+}
+
 template <class T>
 inline T ByteView::get(size_t start) const {
     T value;
@@ -198,10 +204,19 @@ inline void ByteView::get(size_t start, T& dst) const {
 }
 
 inline void ByteView::read(size_t start, uint8_t* dst, size_t len) const {
-    if (start <= size_ && len <= size_ - start)
-        std::memcpy(dst, data_ + start, len);
-    else
+    if (start > size_ || len > (size_ - start))
         throw std::out_of_range("read out of range");
+
+    std::memcpy(dst, data_ + start, len);
+}
+
+inline std::vector<uint8_t> ByteView::readAsVector(size_t start, size_t len) const {
+    if (start > size_ || len > (size_ - start))
+        throw std::out_of_range("read out of range");
+
+    std::vector<uint8_t> bytes(len);
+    std::memcpy(bytes.data(), data_ + start, len);
+    return bytes;
 }
 
 } // namespace LiliumDB
