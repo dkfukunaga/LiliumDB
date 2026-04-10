@@ -45,6 +45,12 @@ public:
     PageNum     pageNum() const noexcept { return pageNum_; }
     PageOffset  pageOffset() const noexcept { return pageNum_ == 0 ? PAGE_ZERO_OFFSET : 0; }
     PageOffset  usableStart() const noexcept { return pageOffset() + sizeof(PageHeader); }
+    uint16_t    usableSize() const noexcept {
+        return pageNum_ == 0 ? PAGE_ZERO_USABLE_SIZE : PAGE_USABLE_SIZE;
+    }
+    uint16_t    minOccupancy() const noexcept {
+        return pageNum_ == 0 ? PAGE_ZERO_MIN_OCCUPANCY : PAGE_MIN_OCCUPANCY;
+    }
     /// Invaldates unpins the underlying page and invalidates PageGuard
     void        reset();
 
