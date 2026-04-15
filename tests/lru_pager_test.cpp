@@ -88,7 +88,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
 
     ASSERT_EQ(header.pageType, PageType::Table);
     ASSERT_EQ(header.pageFlags, PageFlags());
-    ASSERT_EQ(header.treeLevel, INVALID_TREE_LEVEL);
+    ASSERT_EQ(header.level, INVALID_TREE_LEVEL);
     ASSERT_EQ(header.slotCount, 0);
     ASSERT_EQ(header.freeOffset, PAGE_ZERO_OFFSET + PAGE_HEADER_SIZE);
     ASSERT_EQ(header.next, INVALID_PAGE);
@@ -282,7 +282,7 @@ TEST_F(LRUPagerTest, DeletePage) {
 
     hexdumpFile << path << "\n\n";
 
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < pager->pageCount(); ++i) {
         auto r = pager->fetchPage(i);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());
@@ -432,7 +432,7 @@ TEST_F(LRUPagerTest, PageEviction) {
 
     hexdumpFile << path << "\n\n";
 
-    for (int i = 0; i < 11; ++i) {
+    for (int i = 0; i < pager->pageCount(); ++i) {
         auto r = pager->fetchPage(i);
         ASSERT_TRUE(r);
         auto page = std::move(r.value());

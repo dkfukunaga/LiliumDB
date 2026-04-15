@@ -33,6 +33,7 @@ public:
     DbResult<PageGuard>     fetchPage(PageNum pageNum) override;
     DbResult<PageGuard>     newPage(PageType type) override;
     DbResult<void>          deletePage(PageNum pageNum) override;
+    uint32_t                pageCount() override { return pageIO_->pageCount(); }
 
     DbResult<void>          flushPage(PageNum pageNum) override;
     DbResult<void>          flushAll() override;

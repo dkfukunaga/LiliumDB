@@ -42,6 +42,9 @@ public:
     /// Marks the given page as deleted and reclaims its page number for reuse.
     virtual DbResult<void> deletePage(PageNum pageNum) = 0;
 
+    /// Returns the page count
+    virtual uint32_t pageCount() = 0;
+
     // --- Durability ---
 
     /// Flushes the given dirty page to disk immediately.
