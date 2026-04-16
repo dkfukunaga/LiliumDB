@@ -42,9 +42,6 @@ public:
     /// Marks the given page as deleted and reclaims its page number for reuse.
     virtual DbResult<void> deletePage(PageNum pageNum) = 0;
 
-    /// Returns the page count
-    virtual uint32_t pageCount() = 0;
-
     // --- Durability ---
 
     /// Flushes the given dirty page to disk immediately.
@@ -53,6 +50,11 @@ public:
 
     /// Flushes all dirty pages in the buffer pool to disk.
     virtual DbResult<void> flushAll() = 0;
+
+    // --- Utility ---
+
+    /// Returns the page count
+    virtual uint32_t pageCount() = 0;
 };
 
 } // namespace LiliumDB
