@@ -1,3 +1,4 @@
+#include "test_helpers.h"
 #include "pager/lru_pager.h"
 #include "utils/hexdump.h"
 #include "utils/byte_span_macros.h"
@@ -14,12 +15,12 @@ using namespace LiliumDB;
 
 class LRUPagerTest : public ::testing::Test {
 protected:
-    std::string path = "test_db_file.db";
+    std::string testFileName = "test_db_file.db";
     std::unique_ptr<Pager> pager = nullptr;
 
     void SetUp() override {
-        if (std::filesystem::exists((path))) {
-            std::filesystem::remove(path);
+        if (std::filesystem::exists(testFileName)) {
+            std::filesystem::remove(testFileName);
         }
     }
 
@@ -29,7 +30,7 @@ protected:
 };
 
 TEST_F(LRUPagerTest, OpenClose) {
-    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    auto result = LRUPager::open(testFileName, OpenMode::ReadWrite);
     ASSERT_TRUE(result.isOk());
     pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
@@ -39,7 +40,7 @@ TEST_F(LRUPagerTest, OpenClose) {
 }
 
 TEST_F(LRUPagerTest, NewPagefetchPage) {
-    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    auto result = LRUPager::open(testFileName, OpenMode::ReadWrite);
     ASSERT_TRUE(result.isOk());
     pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
@@ -106,7 +107,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
 
     // reopen file
     {
-        auto r1 = LRUPager::open(path, OpenMode::ReadOnly);
+        auto r1 = LRUPager::open(testFileName, OpenMode::ReadOnly);
         ASSERT_TRUE(r1.isOk());
         auto readPager = std::move(r1.value());
         ASSERT_TRUE(readPager->isOpen());
@@ -149,7 +150,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
 }
 
 TEST_F(LRUPagerTest, DeletePage) {
-    auto result = LRUPager::open(path, OpenMode::ReadWrite);
+    auto result = LRUPager::open(testFileName, OpenMode::ReadWrite);
     ASSERT_TRUE(result.isOk());
     pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
@@ -247,7 +248,7 @@ TEST_F(LRUPagerTest, DeletePage) {
     ASSERT_TRUE(pager->close());
 
     // reopen pager to inspect FileHeader
-    result = LRUPager::open(path, OpenMode::ReadWrite);
+    result = LRUPager::open(testFileName, OpenMode::ReadWrite);
     ASSERT_TRUE(result.isOk());
     pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
@@ -274,21 +275,9 @@ TEST_F(LRUPagerTest, DeletePage) {
         auto nextFree = view.get<PageNum>(offsetof(PageHeader, next));
         ASSERT_EQ(nextFree, 5);
     }
-    
+
     // hexdump to a text file to manually inspect
-    auto now = std::time(nullptr);
-    std::string hexdumpFileName = "../../../../debug/hexdump_" + std::to_string(now) + ".hex";
-    std::ofstream hexdumpFile(hexdumpFileName);
-
-    hexdumpFile << path << "\n\n";
-
-    for (int i = 0; i < pager->pageCount(); ++i) {
-        auto r = pager->fetchPage(i);
-        ASSERT_TRUE(r);
-        auto page = std::move(r.value());
-
-        hexdump(hexdumpFile, page.view(), i * PAGE_SIZE, "Page " + std::to_string(i));
-    }
+    testHexDump(*pager, testFileName);
 
     // page goes out of scope and should unpin page
     // pager goes out of scope and should close without error
@@ -296,7 +285,7 @@ TEST_F(LRUPagerTest, DeletePage) {
 
 TEST_F(LRUPagerTest, PageEviction) {
     // open a Pager with a small pool size
-    auto result = LRUPager::open(path, OpenMode::ReadWrite, 3);
+    auto result = LRUPager::open(testFileName, OpenMode::ReadWrite, 3);
     ASSERT_TRUE(result);
     auto pager = std::move(result.value());
     ASSERT_TRUE(pager->isOpen());
@@ -424,19 +413,6 @@ TEST_F(LRUPagerTest, PageEviction) {
         ASSERT_EQ(pageOffset, offset);
     }
 
-    ASSERT_TRUE(pager->flushAll());
-
-    auto now = std::time(nullptr);
-    std::string hexdumpFileName = "../../../../debug/hexdump_" + std::to_string(now) + ".hex";
-    std::ofstream hexdumpFile(hexdumpFileName);
-
-    hexdumpFile << path << "\n\n";
-
-    for (int i = 0; i < pager->pageCount(); ++i) {
-        auto r = pager->fetchPage(i);
-        ASSERT_TRUE(r);
-        auto page = std::move(r.value());
-
-        hexdump(hexdumpFile, page.view(), i * PAGE_SIZE, "Page " + std::to_string(i));
-    }
+    // hexdump to a text file to manually inspect
+    testHexDump(*pager, testFileName);
 }
