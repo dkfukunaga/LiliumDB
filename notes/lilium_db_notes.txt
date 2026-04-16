@@ -164,6 +164,19 @@ Edge cases:
 - Duplicate seek attempts on the same key
 
 
+splitAndInsert:
+- pop page from stack
+- splitLeaf and get back SplitResult{key, child}
+- while parent stack is not empty:
+    - pop page from parent stack
+    - if key fits in page
+        - insertIntoInner
+        - return Ok()
+    - else if the parent stack is not empty (this is not the root page)
+        - splitInner and get back SplitResult{key, child}
+    - else (the parent stack is empty and we've reached the root page)
+        - splitRoot
+- return Ok()
 
 
 
@@ -412,65 +425,105 @@ DBError     — error return code enum
 
 SYS_TABLES
 ==========
-TABLE_ID        INT (PK)
-TABLE_NAME      VARCHAR
-TABLE_TYPE      VARCHAR     // "system", "user"
-TABLE_ROOT      INT
+TABLE_ID        INT32 (PK)
+TABLE_NAME      VARCHAR(63)
+NUM_COLUMNS     INT16
+TABLE_TYPE      VARCHAR(15)         // "system", "user"
 
 SYS_COLUMNS
 ===========
-TABLE_ID        INT (PK, FK -> SYS_TABLES.TABLE_ID)
-COLUMN_INDEX    INT (PK)
-COLUMN_NAME     VARCHAR
-TYPE_ID         INT (FK -> SYS_TYPES.TYPE_ID)
+COLUMN_ID       INT32 (PK)
+TABLE_ID        INT32 (FK -> SYS_TABLES.TABLE_ID)
+TYPE_ID         INT32 (FK -> SYS_TYPES.TYPE_ID)
+SEQUENCE_ID     INT32 (FK -> SYS_SEQUENCES.SEQUENCE_ID, nullable)
+COLUMN_NAME     VARCHAR(63)
+COLUMN_POS      INT16
 IS_NULLABLE     BOOL
-MAX_LENGTH      INT         // for VARCHAR, -1 if unlimited or not applicable
-DEFAULT_VAL     VARCHAR
+MAX_LENGTH      INT32               // for VARCHAR, null otherwise
+PRECISION       INT16 (nullable)    // for DECIMAL, null otherwise
+SCALE           INT16 (nullable)    // for DECIMAL, null otherwise
+DEFAULT_VAL     VARCHAR(255)
+
+SYS_INDEXES
+===========
+INDEX_ID        INT32 (PK)
+TABLE_ID        INT32 (FK -> SYS_TABLES.TABLE_ID)
+INDEX_NAME      VARCHAR(63)
+IS_PRIMARY      BOOL
+IS_UNIQUE       BOOL
+NUM_FIELDS      INT8
+ROOT_PAGE       INT64
+
+SYS_INDEX_FIELDS
+=================
+INDEX_ID        INT32 (PK, FK -> SYS_INDEXES)
+COLUMN_ID       INT32 (PK, FK -> SYS_COLUMNS)
+FIELD_POS       INT16
+IS_DESC         BOOL                // not yet implemented
+PREFIX_LEN      INT32               // not yet implemented
 
 SYS_TYPES
 =========
-TYPE_ID         INT (PK)
-TYPE_NAME       VARCHAR
-TYPE_LENGTH     SMALLINT    // -1 for variable length
-TYPE_CATEGORY   SMALLINT    // maps to an internal enum: INTEGER, FLOAT, STRING, BOOLEAN, DATETIME, ENUM, ARRAY
+TYPE_ID         INT32 (PK)
+TYPE_NAME       VARCHAR(63)
+TYPE_LENGTH     INT32 (nullable)    // null for variable length
+ELEM_TYPE_ID    INT32 (FK -> SYS_TYPES, nullable)   // for arrays
+TYPE_CATEGORY   INT8                // maps to TypeCategory
 
 SYS_ENUM_DEFS
 =============
-TYPE_ID         INT (PK, FK -> SYS_TYPES.TYPE_ID)
-VALUE_ID        INT (PK)
-VALUE_NAME      VARCHAR
+TYPE_ID         INT32 (PK, FK -> SYS_TYPES.TYPE_ID)
+VALUE_ID        INT32 (PK)
+VALUE_NAME      VARCHAR(63)
 
 SYS_SEQUENCES
 =============
-TABLE_ID    INT (PK, FK -> SYS_TABLES.TABLE_ID)
-NEXT_ID     INT             // int64?
+SEQUENCE_ID     INT32 (PK)
+TABLE_ID        INT32 (FK -> SYS_TABLES.TABLE_ID)
+START_VAL       INT64
+NEXT_ID         INT64
 
 
-enum class BuiltInType : uint16_t {
-    Int8     = 1,
-    Int16    = 2,
-    Int32    = 3,
-    Int64    = 4,
-    Float32  = 5,
-    Float64  = 6,
-    Decimal  = 7,   // not yet implemented
-    Boolean  = 8,
-    Varchar  = 9,
-    Date     = 10,  // not yet implemented
-    Time     = 11,  // not yet implemented
-    DateTime = 12,  // not yet implemented
+enum class TypeCategory : uint8_t {
+    BOOL        = 1,
+    INTEGER     = 2,
+    FLOAT       = 3,
+    DECIMAL     = 4,
+    STRING      = 5,
+    DATETIME    = 6,
+    ENUM        = 7,
+    ARRAY       = 8,
+};
+
+enum class BuiltInType : uint32_t {
+    BOOL        = 1,
+    INT8        = 2,
+    INT16       = 3,
+    INT32       = 4,
+    INT64       = 5,    // sequences always take this underlying type
+    FLOAT32     = 6,
+    FLOAT64     = 7,
+    DECIMAL     = 8,    // not yet implemented
+    VARCHAR     = 9,
+    TEXT        = 10,   // not yet implemented
+    BLOB        = 11,   // not yet implemented
+    DATE        = 12,   // not yet implemented
+    TIME        = 13,   // not yet implemented
+    DATETIME    = 14,   // not yet implemented
+};
+
+enum class BuiltInTable : uint32_t {
+    SYS_TABLES          = 1,
+    SYS_COLUMNS         = 2,
+    SYS_INDEXES         = 3,
+    SYS_INDEX_FIELDS    = 4,
+    SYS_TYPES           = 5,
+    SYS_ENUM_DEFS       = 6,
+    SYS_SEQUENCES       = 7,
 };
 
 static constexpr uint16_t USER_TYPE_ID_START  = 1000;
 static constexpr uint16_t USER_TABLE_ID_START = 100;
-
-enum class BuiltInTable : uint32_t {
-    SysTables    = 1,
-    SysTypes     = 2,
-    SysEnumDefs  = 3,
-    SysSequences = 4,
-    SysColumns   = 5,
-};
 
 
 
