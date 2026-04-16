@@ -7,7 +7,7 @@ ByteView getKey(const PageGuard& page, SlotIndex index) {
     PageHeader header = page.getHeader();
     ByteView key;
 
-    if (header.treeLevel == 0) {
+    if (header.level == 0) {
         auto keyValueHeader = page.view().get<KeyValueHeader>(slot.offset);
         key = page.subview(slot.offset + sizeof(KeyValueHeader), keyValueHeader.keySize);
     } else {
@@ -22,8 +22,8 @@ ByteView getValue(const PageGuard& page, SlotIndex index) {
     Slot slot = page.view().get<Slot>(slotOffset(index));
     PageHeader header = page.getHeader();
 
-    assert(header.treeLevel == 0);
-    if (header.treeLevel > 0) return ByteView();
+    assert(header.level == 0);
+    if (header.level > 0) return ByteView();
 
     auto keyValueHeader = page.view().get<KeyValueHeader>(slot.offset);
     return page.subview(
@@ -32,14 +32,20 @@ ByteView getValue(const PageGuard& page, SlotIndex index) {
 }
 
 PageNum getChild(const PageGuard& page, SlotIndex index) {
-    Slot slot = page.view().get<Slot>(slotOffset(index));
+    
     PageHeader header = page.getHeader();
-    assert(header.treeLevel > 0);
 
-    if (header.treeLevel == 0) return INVALID_PAGE;
+    assert(header.level > 0);
+    assert(index <= header.slotCount);
 
-    auto keyHeader = page.view().get<KeyHeader>(slot.offset);
-    return keyHeader.childPage;
+    if (header.slotCount == 0) {    // empty tree
+        return INVALID_PAGE;
+    } else if (index == header.slotCount) {
+        return header.next;
+    } else {
+        Slot slot = page.view().get<Slot>(slotOffset(index));
+        return page.view().get<KeyHeader>(slot.offset).childPage;
+    }
 }
 
 } // namespace LiliumDB

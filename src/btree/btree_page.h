@@ -17,6 +17,8 @@ inline constexpr SlotIndex INVALID_SLOT = std::numeric_limits<SlotIndex>::max();
 inline constexpr uint16_t SLOT_SIZE = 4;
 inline constexpr uint16_t KEY_HEADER_SIZE = 6;
 inline constexpr uint16_t KEY_VALUE_HEADER_SIZE = 4;
+inline constexpr uint16_t KEY_SLOT_OVERHEAD = SLOT_SIZE + KEY_HEADER_SIZE;
+inline constexpr uint16_t KEY_VALUE_SLOT_OVERHEAD = SLOT_SIZE + KEY_VALUE_HEADER_SIZE;
 
 struct Slot {
     PageOffset  offset;
