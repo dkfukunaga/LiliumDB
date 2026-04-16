@@ -52,7 +52,7 @@ struct FileHeader {
     uint8_t     versionMajor = VERSION_MAJOR;
     uint8_t     versionMinor = VERSION_MINOR;
     uint32_t    pageCount = 0;
-    int64_t     fileCreated = 0;                     // seconds since unix epoch
+    int64_t     fileCreated = 0;                    // seconds since unix epoch
     int64_t     lastModified = 0;                   // seconds since unix epoch
     PageNum     freespaceHead = INVALID_PAGE;
     uint8_t     reserved[24] = {0};                 // pad to 64 bytes
@@ -83,8 +83,8 @@ using PageFlags = Flags<PageFlag>;
 struct PageHeader {
     PageType    pageType = PageType::Invalid;
     PageFlags   pageFlags = PageFlags();
-    uint8_t     treeLevel = INVALID_TREE_LEVEL;     // for B+ tree - 0 indicates leaf page
-    uint8_t     reserved = 0;                       // reserved for fragmentCount (future)
+    uint8_t     level = INVALID_TREE_LEVEL;         // for B+ tree - 0 indicates leaf page
+    uint8_t     reserved = 0;                       // pad to 16 bytes
     uint16_t    slotCount = 0;
     PageOffset  freeOffset = INVALID_PAGE_OFFSET;
     PageNum     next = INVALID_PAGE;                // right child for B+ tree internal pages
