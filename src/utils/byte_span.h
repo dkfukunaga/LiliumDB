@@ -99,6 +99,8 @@ public:
     constexpr size_t                    size() const noexcept { return size_; }
 
     constexpr const uint8_t&            operator[](size_t index) const { return data_[index]; }
+    friend bool                         operator==(ByteView lhs, ByteView rhs);
+    friend bool                         operator!=(ByteView lhs, ByteView rhs);
 
     using const_iterator                = const uint8_t*;
     using const_reverse_iterator        = std::reverse_iterator<const_iterator>;
@@ -217,6 +219,15 @@ inline std::vector<uint8_t> ByteView::readAsVector(size_t start, size_t len) con
     std::vector<uint8_t> bytes(len);
     std::memcpy(bytes.data(), data_ + start, len);
     return bytes;
+}
+
+inline bool operator==(ByteView lhs, ByteView rhs) {
+    return lhs.size() == rhs.size() &&
+           (lhs.data() == rhs.data() || std::memcmp(lhs.data(), rhs.data(), lhs.size()) == 0);
+}
+
+inline bool operator!=(ByteView lhs, ByteView rhs) {
+    return !(lhs == rhs);
 }
 
 } // namespace LiliumDB
