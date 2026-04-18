@@ -33,7 +33,8 @@ private:
 
     struct SplitResult {
         std::vector<uint8_t>    key;
-        PageNum                 child;
+        PageNum                 leftChild;
+        PageNum                 rightChild;
     };
     // using MaybeSplit = std::optional<SplitResult>;
 
@@ -57,7 +58,8 @@ private:
         PageGuard& page,
         SlotIndex index,
         ByteView key,
-        PageNum child);
+        PageNum leftChild,
+        PageNum rightChild);
 
     DbResult<void> splitAndInsert(
         ParentStack&& stack,
@@ -72,9 +74,11 @@ private:
         PageGuard& leftPage,
         SlotIndex index,
         std::vector<uint8_t> key,
-        PageNum child);
+        PageNum leftChild,
+        PageNum rightChild);
     DbResult<void> promoteRoot(
         PageGuard& rootPage,
+        PageGuard& rightPage,
         ByteView key
     );
 

@@ -223,11 +223,11 @@ uint16_t BTree::compactPage(PageGuard& page) {
 
         // update slot and write to slot buffer
         slot.offset = start + cellBufOffset;
-        slotBufSpan.put<Slot>(slotBufOffset, slot);
+        slotBufSpan.put<Slot>(slotBufOffset - static_cast<uint16_t>(i) * sizeof(Slot), slot);
 
         cellBufOffset += slot.size;
-        assert(slotBufOffset >= sizeof(Slot));
-        slotBufOffset = static_cast<uint16_t>(slotBufOffset - sizeof(Slot));
+        // assert(slotBufOffset >= sizeof(Slot));
+        // slotBufOffset = static_cast<uint16_t>(slotBufOffset - sizeof(Slot));
     }
 
     // write compacted cell buffer and slot buffer to page
@@ -267,13 +267,18 @@ void BTree::insertIntoLeaf(PageGuard& page, SlotIndex index, ByteView key, ByteV
     page.setHeader(header);
 }
 
-void BTree::insertIntoInner(PageGuard& page, SlotIndex index, ByteView key, PageNum child) {
+void BTree::insertIntoInner(
+    PageGuard& page,
+    SlotIndex index,
+    ByteView key,
+    PageNum leftChild,
+    PageNum rightChild) {
     auto header = page.getHeader();
     auto cellOffset = header.freeOffset;
     uint16_t totalSize = static_cast<uint16_t>(sizeof(KeyHeader) + key.size());
 
     // write key-value cell with header
-    KeyHeader keyHeader{static_cast<uint16_t>(key.size()), child};
+    KeyHeader keyHeader{static_cast<uint16_t>(key.size()), leftChild};
     page.span().put<KeyHeader>(cellOffset, keyHeader);
     page.span().write(cellOffset + sizeof(KeyHeader), key);
 
@@ -287,6 +292,9 @@ void BTree::insertIntoInner(PageGuard& page, SlotIndex index, ByteView key, Page
     header.slotCount++;
     header.freeOffset += totalSize;
     page.setHeader(header);
+
+    // update next pointer to point to right page
+    setChild(page, index + 1, rightChild);
 }
 
 DbResult<void> BTree::splitAndInsert(
@@ -310,7 +318,7 @@ DbResult<void> BTree::splitAndInsert(
         stack.pop_back();
         PageHeader header = page.getHeader();
 
-        // check if key will fit
+        // calculate free space and insertion size
         uint16_t freeSpace = static_cast<uint16_t>(
             (PAGE_END_OFFSET - header.slotCount * sizeof(Slot)) - header.freeOffset);
         uint16_t insertSize = static_cast<uint16_t>(
@@ -322,17 +330,22 @@ DbResult<void> BTree::splitAndInsert(
         // if the separator key fits, insert and exit loop
         // else, split and continue root
         if (freeSpace >= insertSize) {
-            insertIntoInner(page, index, ByteView(splitResult.key), splitResult.child);
+            insertIntoInner(page, index, ByteView(splitResult.key), splitResult.leftChild, splitResult.rightChild);
             needsRootPromotion = false;
             break;
         } else if (!stack.empty()) {
-            ASSIGN_OR_RETURN(splitResult, splitInner(page, index, splitResult.key, splitResult.child));
+            ASSIGN_OR_RETURN(splitResult, splitInner(page, index, splitResult.key, splitResult.leftChild, splitResult.rightChild));
         }
     }
 
     // if the stack is empty, we've reached the root and need to promote the left page to a new root page
     if (needsRootPromotion && stack.empty()) {
-        RETURN_ON_ERROR(promoteRoot(page, ByteView(splitResult.key)));
+        if (page.getHeader().level > 0) {
+            ASSIGN_OR_RETURN(splitResult, splitInner(page, index, splitResult.key, splitResult.leftChild, splitResult.rightChild));
+        }
+        PageGuard rightPage;
+        ASSIGN_OR_RETURN(rightPage, pager_.fetchPage(splitResult.rightChild));
+        RETURN_ON_ERROR(promoteRoot(page, rightPage, ByteView(splitResult.key)));
     }
 
     return Ok();
@@ -351,7 +364,7 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
             return static_cast<uint16_t>(KEY_VALUE_SLOT_OVERHEAD + key.size() + value.size());
         SlotIndex physical = logical < index ? logical : logical - 1;
         Slot s = leftPage.view().get<Slot>(slotOffset(physical));
-        return KEY_VALUE_SLOT_OVERHEAD + s.size;
+        return sizeof(Slot) + s.size;
     };
 
     struct Entry { std::vector<uint8_t> key; std::vector<uint8_t> value; };
@@ -382,6 +395,7 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
     uint16_t nextDiff = 0;
 
     while (tempPageSize < minOccupancy) {
+        assert(splitIndex <= slotCount); // slotCount + 1 logical entries total
         tempPageSize += logicalSize(splitIndex);
         
         if (tempPageSize >= minOccupancy) {
@@ -416,8 +430,7 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
         insertIntoLeaf(rightPage, i - splitIndex, ByteView(entry.key), ByteView(entry.value));
     }
     
-    // if leftPage.next pointed to a valid next page, update nextpage.prev
-    // to point to rightPage
+    // if leftPage.next pointed to a valid next page, update nextpage.prev to point to rightPage
     if (leftHeader.next != INVALID_PAGE) {
         PageGuard nextPage;
         ASSIGN_OR_RETURN(nextPage, pager_.fetchPage(leftHeader.next));
@@ -432,23 +445,24 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
     leftPage.setHeader(leftHeader);
     compactPage(leftPage);
 
-    return Ok(SplitResult{separatorKey, rightPage.pageNum()});
+    return Ok(SplitResult{separatorKey, leftPage.pageNum(), rightPage.pageNum()});
 }
 
 DbResult<BTree::SplitResult> BTree::splitInner(
     PageGuard& leftPage,
     SlotIndex index,
     std::vector<uint8_t> key,
-    PageNum child) {
+    PageNum leftChild,
+    PageNum rightChild) {
     // helper lambdas
 
     // returns total size of an entry and its slot
     auto logicalSize = [&](SlotIndex logical) -> uint16_t {
         if (logical == index)
-            return static_cast<uint16_t>(KEY_SLOT_OVERHEAD + key.size() + sizeof(PageNum));
+            return KEY_SLOT_OVERHEAD + static_cast<uint16_t>(key.size());
         SlotIndex physical = logical < index ? logical : logical - 1;
         Slot s = leftPage.view().get<Slot>(slotOffset(physical));
-        return KEY_SLOT_OVERHEAD + s.size;
+        return sizeof(Slot) + s.size;
     };
 
     struct Entry { std::vector<uint8_t> key; PageNum child; };
@@ -457,7 +471,7 @@ DbResult<BTree::SplitResult> BTree::splitInner(
     // into its logical place in the sequence of slots
     auto logicalEntry = [&](SlotIndex logical) -> Entry {
         if (logical == index)
-            return { key, child };
+            return { key, leftChild };
         SlotIndex physical = logical < index ? logical : logical - 1;
         Slot s = leftPage.view().get<Slot>(slotOffset(physical));
         KeyHeader kh = leftPage.view().get<KeyHeader>(s.offset);
@@ -479,6 +493,7 @@ DbResult<BTree::SplitResult> BTree::splitInner(
     uint16_t nextDiff = 0;
 
     while (tempPageSize < minOccupancy) {
+        assert(splitIndex < slotCount + 1); // slotCount + 1 logical entries total
         tempPageSize += logicalSize(splitIndex);
         
         if (tempPageSize >= minOccupancy) {
@@ -508,35 +523,81 @@ DbResult<BTree::SplitResult> BTree::splitInner(
     // insert entries from the split entry onwards into rightPage
     for (SlotIndex i = splitIndex + 1; i < slotCount + 1; ++i) {
         Entry entry = logicalEntry(i);
-        insertIntoInner(rightPage, static_cast<SlotIndex>(i - splitIndex - 1), ByteView(entry.key), entry.child);
+        PageNum nextPage;
+        if (i < slotCount) {
+            nextPage = logicalEntry(i+1).child;
+        } else {
+            nextPage = rightChild;
+        }
+        insertIntoInner(rightPage,
+            static_cast<SlotIndex>(i - splitIndex - 1),
+            ByteView(entry.key),
+            entry.child, nextPage);
     }
 
     // update header for leftPage and compact entries
     leftHeader.slotCount = splitIndex;
+    leftHeader.next = logicalEntry(splitIndex).child;
     leftPage.setHeader(leftHeader);
     compactPage(leftPage);
 
-    return Ok(SplitResult{separatorKey, rightPage.pageNum()});
+    return Ok(SplitResult{separatorKey, leftPage.pageNum(), rightPage.pageNum()});
 }
 
 DbResult<void> BTree::promoteRoot(
     PageGuard& rootPage,
+    PageGuard& rightPage,
     ByteView key) {
-    // allocate a new left page and copy old left page into it
+    auto rootHeader = rootPage.getHeader();
+    // allocate a new left page
     PageGuard leftPage;
     ASSIGN_OR_RETURN(leftPage, pager_.newPage(type_));
-    memcpy(leftPage.span().data(), rootPage.view().data(), PAGE_SIZE);
 
-    // reset root page to an empty page and increment its level
-    auto rootHeader = rootPage.getHeader();
+    // copy old left page into new left page
+    if (rootHeader.level == 0) {
+        for (SlotIndex i = 0; i < rootHeader.slotCount; ++i) {
+            auto k = getKey(rootPage, i);
+            auto v = getValue(rootPage, i);
+            insertIntoLeaf(leftPage, i, k, v);
+        }
+    } else {
+        for (SlotIndex i = 0; i < rootHeader.slotCount; ++i) {
+            auto k = getKey(rootPage, i);
+            auto c = getChild(rootPage, i);
+            PageNum n;
+            if (i == rootHeader.slotCount - 1) {
+                n = rootHeader.next;
+            } else {
+                n = getChild(rootPage, i + 1);
+            }
+            insertIntoInner(leftPage, i, k, c, n);
+        }
+    }
+
+    // update headers
+    auto leftHeader = leftPage.getHeader();
+    auto rightHeader = rightPage.getHeader();
+    
+    leftHeader.level = rootHeader.level;
+    leftHeader.next = rootHeader.next;
+    leftPage.setHeader(leftHeader);
+
+    rightHeader.level = rootHeader.level;
+    if (rightHeader.level == 0) {
+        rightHeader.prev = leftPage.pageNum();
+    }
+    rightPage.setHeader(rightHeader);
+
     rootHeader.level++;
     rootHeader.slotCount = 0;
     rootHeader.freeOffset = rootPage.usableStart();
+    rootHeader.next = rightPage.pageNum();
     rootHeader.prev = INVALID_PAGE;
+    // rootHeader.next is already set to rightPage.pageNum
     rootPage.setHeader(rootHeader);
 
     // insert separator key
-    insertIntoInner(rootPage, 0, key, leftPage.pageNum());
+    insertIntoInner(rootPage, 0, key, leftPage.pageNum(), rightPage.pageNum());
 
     return Ok();
 }
