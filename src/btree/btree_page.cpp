@@ -48,4 +48,20 @@ PageNum getChild(const PageGuard& page, SlotIndex index) {
     }
 }
 
+void setChild(PageGuard& page, SlotIndex index, PageNum child) {
+    
+    PageHeader header = page.getHeader();
+
+    assert(header.level > 0);
+    assert(index <= header.slotCount);
+
+    if (index == header.slotCount) {
+        header.next = child;
+        page.setHeader(header);
+    } else {
+        Slot slot = page.view().get<Slot>(slotOffset(index));
+        page.span().put<PageNum>(slot.offset + offsetof(KeyHeader, childPage), child);
+    }
+}
+
 } // namespace LiliumDB

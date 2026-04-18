@@ -56,6 +56,7 @@ inline PageOffset slotOffset(int index) noexcept {
 ByteView getKey(const PageGuard& page, SlotIndex index);
 ByteView getValue(const PageGuard& page, SlotIndex index);
 PageNum getChild(const PageGuard& page, SlotIndex index);
+void setChild(PageGuard& page, SlotIndex index, PageNum child);
 
 } // namespace LiliumDB
 
