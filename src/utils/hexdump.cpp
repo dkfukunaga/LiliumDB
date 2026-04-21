@@ -14,9 +14,13 @@ void hexdump(std::ostream& out,
     char line[81] = {};
     int lineOffset = 0;
 
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wformat-nonliteral"
+    #pragma GCC diagnostic ignored "-Wformat-security"
     auto writeToLine = [&](const char* fmt, auto... args) {
-        lineOffset += snprintf(line + lineOffset, sizeof(line) - lineOffset, fmt, args...);
+        lineOffset += snprintf(line + lineOffset, sizeof(line) - static_cast<size_t>(lineOffset), fmt, args...);
     };
+    #pragma GCC diagnostic pop
     auto outputLine = [&]() {
         out << line << '\n';
         lineOffset = 0;
@@ -75,7 +79,7 @@ void hexdump(std::ostream& out,
         writeToLine("| %08llX |", address);
 
         // print hex values
-        for (int i = 0; i < 16; ++i) {
+        for (size_t i = 0; i < 16; ++i) {
             if (address + i < baseAddress || address + i >= end) {
                 // print blanks for bytes outside of ByteView
                 writeToLine("   ");
@@ -93,7 +97,7 @@ void hexdump(std::ostream& out,
         writeToLine(" |");
 
         // print ASCII represetntation
-        for (int i = 0; i < 16; ++i) {
+        for (size_t i = 0; i < 16; ++i) {
             if (address + i < baseAddress || address + i >= end) {
                 // print blanks for bytes outside of ByteView
                 writeToLine(" ");
