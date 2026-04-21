@@ -11,8 +11,6 @@
 
 namespace LiliumDB {
 
-using namespace LiliumDB::BTreePage;
-
 class BTree {
 public:
     BTree(Pager& pager, PageNum root, PageType type)

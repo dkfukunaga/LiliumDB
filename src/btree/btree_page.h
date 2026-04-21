@@ -1,18 +1,12 @@
 #ifndef LILIUMDB_BTREE_TYPES_H
 #define LILIUMDB_BTREE_TYPES_H
 
-#include <limits>
-
 #include "common/types.h"
 #include "common/file_format.h"
 #include "utils/byte_span.h"
 #include "pager/page_guard.h"
 
-namespace LiliumDB::BTreePage {
-
-using SlotIndex = uint16_t;
-
-inline constexpr SlotIndex INVALID_SLOT = std::numeric_limits<SlotIndex>::max();
+namespace LiliumDB {
 
 inline constexpr uint16_t SLOT_SIZE = 4;
 inline constexpr uint16_t KEY_HEADER_SIZE = 6;
@@ -46,6 +40,10 @@ struct KeyValueHeader {
 
 static_assert(sizeof(KeyValueHeader) == KEY_VALUE_HEADER_SIZE);
 
+} // namespace LiliumDB
+
+namespace LiliumDB::BTreePage {
+
 inline PageOffset slotOffset(SlotIndex index) noexcept {
     return static_cast<PageOffset>(PAGE_END_OFFSET - (index + 1) * sizeof(Slot));
 }
@@ -58,8 +56,14 @@ ByteView getValue(const PageGuard& page, SlotIndex index);
 PageNum getChild(const PageGuard& page, SlotIndex index);
 void setChild(PageGuard& page, SlotIndex index, PageNum child);
 
-uint16_t usedSpace(const PageGuard& page);
-uint16_t freeSpace(const PageGuard& page);
+inline uint16_t freeSpace(const PageGuard& page) {
+    auto header = page.getHeader();
+    return slotOffset(header.slotCount - 1) - header.freeOffset;
+}
+
+inline uint16_t usedSpace(const PageGuard& page) {
+    return page.usableSize() - freeSpace(page);
+}
 
 } // namespace LiliumDB::BTreePage
 

@@ -4,9 +4,9 @@
 
 #include "btree_page.h"
 
-namespace LiliumDB {
-
 using namespace LiliumDB::BTreePage;
+
+namespace LiliumDB {
 
 DbResult<void> BTree::insert(ByteView key, ByteView value) {
     BTree::ParentStack stack;

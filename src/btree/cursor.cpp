@@ -1,8 +1,8 @@
 #include "cursor.h"
 
-namespace LiliumDB {
-
 using namespace LiliumDB::BTreePage;
+
+namespace LiliumDB {
 
 DbResult<void> Cursor::next() {
     PageHeader header = page_.getHeader();

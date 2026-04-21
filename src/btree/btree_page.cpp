@@ -64,12 +64,4 @@ void setChild(PageGuard& page, SlotIndex index, PageNum child) {
     }
 }
 
-uint16_t usedSpace(const PageGuard& page) {
-
-}
-
-uint16_t freeSpace(const PageGuard& page) {
-
-}
-
 } // namespace LiliumDB::BTreePage

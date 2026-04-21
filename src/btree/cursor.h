@@ -9,8 +9,6 @@
 
 namespace LiliumDB {
 
-using namespace LiliumDB::BTreePage;
-
 class Cursor {
 public:
     Cursor(Pager* pager, PageGuard page, SlotIndex slot)
@@ -21,7 +19,11 @@ public:
         if (slot == INVALID_SLOT)
             invalidate();
     }
-    Cursor() : pager_(nullptr), page_(PageGuard()), slot_(INVALID_SLOT), valid_(false) { }
+    Cursor()
+        : pager_(nullptr)
+        , page_(PageGuard())
+        , slot_(INVALID_SLOT)
+        , valid_(false) { }
     Cursor(const Cursor&) = delete;
     Cursor(Cursor&& other) noexcept
         : pager_(other.pager_)
@@ -32,8 +34,12 @@ public:
     }
     ~Cursor() = default;
 
-    ByteView        key()   const { return valid_? getKey(page_, slot_) : ByteView(); }
-    ByteView        value() const { return valid_? getValue(page_, slot_) : ByteView(); }
+    ByteView        key()   const {
+        return valid_? LiliumDB::BTreePage::getKey(page_, slot_) : ByteView();
+    }
+    ByteView        value() const {
+        return valid_? LiliumDB::BTreePage::getValue(page_, slot_) : ByteView();
+    }
     bool            valid() const { return valid_; }
 
     DbResult<void>  next();
