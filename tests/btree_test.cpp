@@ -172,10 +172,10 @@ TEST_F(BTreeTest, SplitAndInsert) {
     // shuffle vector ordering to test out of order insertion
     std::shuffle(kvs.begin(), kvs.end(), rng);
 
-    for (const auto& [key, value] : kvs) {
-        printf("%.2s ", (char*)key.data());
-    }
-    printf("\n");
+    // for (const auto& [key, value] : kvs) {
+    //     printf("%.2s ", (char*)key.data());
+    // }
+    // printf("\n");
 
     int count = 0;
     for (const auto& [key, value] : kvs) {
