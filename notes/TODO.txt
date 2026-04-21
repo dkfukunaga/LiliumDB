@@ -1,5 +1,6 @@
 TODO:
 ====
 BTree:
-- 
+- implement rebalance and merge logic
+- test cursor behavior
 
