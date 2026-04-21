@@ -50,6 +50,11 @@ public:
 
     /// Flushes all dirty pages in the buffer pool to disk.
     virtual DbResult<void> flushAll() = 0;
+
+    // --- Utility ---
+
+    /// Returns the page count
+    virtual uint32_t pageCount() = 0;
 };
 
 } // namespace LiliumDB

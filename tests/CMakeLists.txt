@@ -8,6 +8,8 @@ FetchContent_MakeAvailable(googletest)
 
 include(GoogleTest)
 
+file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}" CPP_PATH)
+
 add_executable(byte_span_test byte_span_test.cpp)
 target_link_libraries(byte_span_test PRIVATE liliumdb_headers GTest::gtest_main)
 gtest_discover_tests(byte_span_test)
@@ -31,3 +33,9 @@ gtest_discover_tests(flags_test)
 add_executable(lru_pager_test lru_pager_test.cpp)
 target_link_libraries(lru_pager_test PRIVATE liliumdb_lib GTest::gtest_main)
 gtest_discover_tests(lru_pager_test)
+target_compile_definitions(lru_pager_test PRIVATE "PROJECT_ROOT=${CPP_PATH}")
+
+add_executable(btree_test btree_test.cpp)
+target_link_libraries(btree_test PRIVATE liliumdb_lib GTest::gtest_main)
+gtest_discover_tests(btree_test)
+target_compile_definitions(btree_test PRIVATE "PROJECT_ROOT=${CPP_PATH}")

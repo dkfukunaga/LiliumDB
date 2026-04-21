@@ -7,13 +7,10 @@
 namespace LiliumDB {
 
 using PageNum       = uint32_t;
-using SlotIndex     = uint16_t;
 using PageOffset    = uint16_t;
-using RecordSize    = uint16_t;
 
-// sentinel values for invalid offsets
+// sentinel value for invalid page
 inline constexpr PageNum INVALID_PAGE = std::numeric_limits<PageNum>::max();
-inline constexpr SlotIndex INVALID_SLOT = std::numeric_limits<SlotIndex>::max();
 
 } // namespace LiliumDB
 

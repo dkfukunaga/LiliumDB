@@ -116,6 +116,14 @@ TEST(ByteViewTest, Iterators) {
     EXPECT_EQ(reverse_collected, std::vector<uint8_t>({255, 200, 100}));
 }
 
+TEST(ByteViewTest, GetAsVector) {
+    std::vector<uint8_t> data = {1, 2, 3, 4, 5};
+    ByteView view(data.data(), data.size());
+
+    auto vec = view.readAsVector(1, 3);
+    EXPECT_EQ(vec, std::vector<uint8_t>({2, 3, 4}));
+}
+
 struct TestHeader {
     uint16_t id;
     uint32_t offset;
@@ -123,18 +131,25 @@ struct TestHeader {
 };
 
 TEST(ByteSpanMacrosTest, RoundTrip) {
+
     std::vector<uint8_t> buf(sizeof(TestHeader), 0);
     ByteSpan span(buf.data(), buf.size());
     ByteView view(buf.data(), buf.size());
-    TestHeader header{ 42, 1024, 0xFF };
+    TestHeader header1{ 42, 1024, 0xFF };
 
-    SPAN_WRITE_STRUCT_FIELD(span, header, id);
-    SPAN_WRITE_STRUCT_FIELD(span, header, offset);
-    SPAN_WRITE_STRUCT_FIELD(span, header, flags);
+    SPAN_WRITE_STRUCT_FIELD(span, header1, id);
+    SPAN_WRITE_STRUCT_FIELD(span, header1, offset);
+    SPAN_WRITE_STRUCT_FIELD(span, header1, flags);
 
-    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, id),     header.id);
-    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, offset), header.offset);
-    EXPECT_EQ(VIEW_READ_STRUCT_FIELD(view, header, flags),  header.flags);
+    TestHeader header2{};
+
+    VIEW_READ_STRUCT_FIELD(view, header2, id);
+    VIEW_READ_STRUCT_FIELD(view, header2, offset);
+    VIEW_READ_STRUCT_FIELD(view, header2, flags);
+
+    EXPECT_EQ(header2.id, header1.id);
+    EXPECT_EQ(header2.offset, header1.offset);
+    EXPECT_EQ(header2.flags, header1.flags);
 }
 
 TEST(ByteSpanMacrosTest, CorrectOffset) {
