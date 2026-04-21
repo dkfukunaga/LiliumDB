@@ -6,6 +6,8 @@
 
 namespace LiliumDB {
 
+using namespace LiliumDB::BTreePage;
+
 DbResult<void> BTree::insert(ByteView key, ByteView value) {
     BTree::ParentStack stack;
     // printf("Searching for key %.2s ...\n    ", (char*)key.data());
@@ -70,7 +72,7 @@ DbResult<bool> BTree::remove(ByteView key) {
     header.slotCount--;
     page.setHeader(header);
 
-    // call rebalance if page is now under minimum occupancy
+    // call mergeOrRedistribute if page is now under minimum occupancy
 
     return Ok(true);
 }
@@ -633,7 +635,7 @@ DbResult<void> BTree::promoteRoot(
     return Ok();
 }
 
-DbResult<void> BTree::rebalance(ParentStack&& stack) {
+DbResult<void> BTree::mergeOrRedistribute(ParentStack&& stack) {
     
 }
 

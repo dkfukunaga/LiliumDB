@@ -2,6 +2,8 @@
 
 namespace LiliumDB {
 
+using namespace LiliumDB::BTreePage;
+
 DbResult<void> Cursor::next() {
     PageHeader header = page_.getHeader();
 

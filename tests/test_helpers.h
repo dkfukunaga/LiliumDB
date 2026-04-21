@@ -82,20 +82,20 @@ void logPageInfo(LiliumDB::Pager& pager,
         logFile << "  slots:\n";
         
         for (int s = 0; s < header.slotCount; ++s) {
-            auto slot = page.view().get<LiliumDB::Slot>(LiliumDB::slotOffset(s));
+            auto slot = page.view().get<LiliumDB::BTreePage::Slot>(LiliumDB::BTreePage::slotOffset(s));
             logFile << "    " << s << ": offset=" << slot.offset << " size=" << slot.size << "\n";
         }
         
         logFile << "  keys:\n";
         for (int s = 0; s < header.slotCount; ++s) {
-            auto slot = page.view().get<LiliumDB::Slot>(LiliumDB::slotOffset(s));
+            auto slot = page.view().get<LiliumDB::BTreePage::Slot>(LiliumDB::BTreePage::slotOffset(s));
             if (header.level > 0) {
-                auto kh = page.view().get<LiliumDB::KeyHeader>(slot.offset);
-                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::KeyHeader);
+                auto kh = page.view().get<LiliumDB::BTreePage::KeyHeader>(slot.offset);
+                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::BTreePage::KeyHeader);
                 logFile << "    " << std::string(keyData, 2) << " -> page " << kh.childPage << "\n";
             } else {
-                auto kv = page.view().get<LiliumDB::KeyValueHeader>(slot.offset);
-                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::KeyValueHeader);
+                auto kv = page.view().get<LiliumDB::BTreePage::KeyValueHeader>(slot.offset);
+                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::BTreePage::KeyValueHeader);
                 logFile << "    " << std::string(keyData, 2) << "\n";
             }
         }

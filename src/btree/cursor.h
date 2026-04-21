@@ -9,6 +9,8 @@
 
 namespace LiliumDB {
 
+using namespace LiliumDB::BTreePage;
+
 class Cursor {
 public:
     Cursor(Pager* pager, PageGuard page, SlotIndex slot)

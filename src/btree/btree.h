@@ -11,6 +11,8 @@
 
 namespace LiliumDB {
 
+using namespace LiliumDB::BTreePage;
+
 class BTree {
 public:
     BTree(Pager& pager, PageNum root, PageType type)
@@ -82,7 +84,7 @@ private:
         ByteView key
     );
 
-    DbResult<void> rebalance(ParentStack&& stack);
+    DbResult<void> mergeOrRedistribute(ParentStack&& stack);
     DbResult<MergeResult> mergeLeaf(PageGuard& leftPage, PageGuard& rightPage);
     DbResult<MergeResult> mergeInner(PageGuard& leftPage, PageGuard& rightPage);
 };

@@ -1,6 +1,6 @@
 #include "btree_page.h"
 
-namespace LiliumDB {
+namespace LiliumDB::BTreePage {
 
 ByteView getKey(const PageGuard& page, SlotIndex index) {
     Slot slot = page.view().get<Slot>(slotOffset(index));
@@ -64,4 +64,12 @@ void setChild(PageGuard& page, SlotIndex index, PageNum child) {
     }
 }
 
-} // namespace LiliumDB
+uint16_t usedSpace(const PageGuard& page) {
+
+}
+
+uint16_t freeSpace(const PageGuard& page) {
+
+}
+
+} // namespace LiliumDB::BTreePage
