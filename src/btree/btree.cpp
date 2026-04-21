@@ -8,11 +8,15 @@ namespace LiliumDB {
 
 DbResult<void> BTree::insert(ByteView key, ByteView value) {
     BTree::ParentStack stack;
+    // printf("Searching for key %.2s ...\n    ", (char*)key.data());
     ASSIGN_OR_RETURN(stack, search(key));
+    // printf("Found!\n");
 
     PageGuard& page = stack.back().page;
     SlotIndex index = stack.back().index;
     PageHeader header = page.getHeader();
+
+    // printf("Inserting key %.2s into page %d at index %d ...\n    ", (char*)key.data(), page.pageNum(), index);
 
     uint16_t freeSpace = static_cast<uint16_t>(
         (PAGE_END_OFFSET - header.slotCount * sizeof(Slot)) - header.freeOffset);
@@ -28,6 +32,8 @@ DbResult<void> BTree::insert(ByteView key, ByteView value) {
     } else {
         RETURN_ON_ERROR(splitAndInsert(std::move(stack), key, value));
     }
+
+    // printf("complete!\n");
 
     return Ok();
 }
@@ -132,14 +138,19 @@ DbResult<BTree::ParentStack> BTree::search(ByteView key) const {
     }
 
     while (header.level > 0) {
+        // printf("searching inner page %d ...\n    ", page.pageNum());
         index = searchInner(page, key);
+        // printf("found index %d ", index);
         PageNum child = getChild(page, index);
+        // printf("child %d ...\n    ", child);
 
         stack.push_back({std::move(page), index});
         ASSIGN_OR_RETURN(page, pager_.fetchPage(child));
         header = page.getHeader();
     }
+    // printf("searching leaf page %d ...\n    ", page.pageNum());
     index = searchLeaf(page, key);
+    // printf("found index %d ...\n    ", index);
     stack.push_back({std::move(page), index});
     return Ok(std::move(stack));
 }
@@ -151,17 +162,21 @@ SlotIndex BTree::searchInner(PageGuard& page, ByteView key) const {
 
     while (low <= high) {
         mid = static_cast<SlotIndex>(low + (high - low) / 2);
+        // printf("low = %d mid = %d high = %d\n    ", low, mid, high);
         auto slot = page.view().get<Slot>(slotOffset(mid));
         auto keyHeader = page.view().get<KeyHeader>(slot.offset);
         auto slotKey = page.subview(slot.offset + sizeof(KeyHeader), keyHeader.keySize);
+        // auto slotKey = getKey(page, mid);
 
         auto comp = memcmp(key.data(), slotKey.data(), std::min(key.size(), slotKey.size()));
         if (comp == 0) {
             comp = (int) key.size() - (int) slotKey.size();
         }
+        // printf("comp = %d\n    ", comp);
         if (comp == 0) {
             return mid;
         } else if (comp < 0) {
+            if (mid == 0) return mid;
             high = mid - 1;
         } else {
             low = mid + 1;
@@ -284,7 +299,12 @@ void BTree::insertIntoInner(
 
     // relocate slots to make space for new slot
     for (int i = header.slotCount - 1; i >= static_cast<int>(index); --i) {
-        page.span().copy_within(slotOffset(i), slotOffset(i + 1), sizeof(Slot));
+        // Slot before = page.view().get<Slot>(slotOffset(i));
+        // printf("  shifting slot %d (offset=%d size=%d) to slot %d\n", i, before.offset, before.size, i+1);
+        page.span().copy_within(slotOffset(i + 1), slotOffset(i), sizeof(Slot));
+        // Slot after = page.view().get<Slot>(slotOffset(i + 1));
+        // printf("      result: offset=%d size=%d\n", after.offset, after.size);
+        // printf("      slotOffset(0)=%d slotOffset(1)=%d\n", slotOffset(0), slotOffset(1));
     }
     page.span().put<Slot>(slotOffset(index), Slot{cellOffset, totalSize});
 
@@ -409,6 +429,8 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
             splitIndex++;
         }
     }
+    // printf("splitLeaf: slotCount=%d, index=%d, splitIndex=%d, key=%.2s\n    ", slotCount, index, splitIndex, (char*)key.data());
+
 
     std::vector<uint8_t> separatorKey = logicalEntry(splitIndex).key;
 
@@ -441,9 +463,12 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
 
     // update header for leftPage and compact entries
     leftHeader.next = rightPage.pageNum();
-    leftHeader.slotCount = splitIndex;
+    leftHeader.slotCount = index < splitIndex ? splitIndex - 1 : splitIndex;
     leftPage.setHeader(leftHeader);
     compactPage(leftPage);
+    if (index < splitIndex) {
+        insertIntoLeaf(leftPage, index, ByteView(key), ByteView(value));
+    }
 
     return Ok(SplitResult{separatorKey, leftPage.pageNum(), rightPage.pageNum()});
 }
@@ -477,7 +502,7 @@ DbResult<BTree::SplitResult> BTree::splitInner(
         KeyHeader kh = leftPage.view().get<KeyHeader>(s.offset);
         return {
             leftPage.view().readAsVector(s.offset + KEY_HEADER_SIZE, kh.keySize),
-            kh.childPage
+            logical == index + 1 ? rightChild : kh.childPage
         };
     };
 
@@ -509,14 +534,17 @@ DbResult<BTree::SplitResult> BTree::splitInner(
     }
 
     std::vector<uint8_t> separatorKey = logicalEntry(splitIndex).key;
+    auto leftNext = logicalEntry(splitIndex).child;
 
     // allocate a new page for rightPage
     PageGuard rightPage;
     ASSIGN_OR_RETURN(rightPage, pager_.newPage(type_));
+    setChild(leftPage, splitIndex, leftChild);
 
     // update header for rightPage
     auto rightHeader = rightPage.getHeader();
     rightHeader.level = leftHeader.level;
+    rightHeader.next = leftHeader.next;
     // slotCount and freeOffset updated by insertIntoInner()
     rightPage.setHeader(rightHeader);
 
@@ -527,7 +555,7 @@ DbResult<BTree::SplitResult> BTree::splitInner(
         if (i < slotCount) {
             nextPage = logicalEntry(i+1).child;
         } else {
-            nextPage = rightChild;
+            nextPage = leftHeader.next;
         }
         insertIntoInner(rightPage,
             static_cast<SlotIndex>(i - splitIndex - 1),
@@ -536,10 +564,13 @@ DbResult<BTree::SplitResult> BTree::splitInner(
     }
 
     // update header for leftPage and compact entries
-    leftHeader.slotCount = splitIndex;
-    leftHeader.next = logicalEntry(splitIndex).child;
+    leftHeader.slotCount = index < splitIndex ? splitIndex - 1 : splitIndex;
+    leftHeader.next = leftNext;
     leftPage.setHeader(leftHeader);
     compactPage(leftPage);
+    if (index < splitIndex) {
+        insertIntoInner(leftPage, index, ByteView(key), leftChild, rightChild);
+    }
 
     return Ok(SplitResult{separatorKey, leftPage.pageNum(), rightPage.pageNum()});
 }
