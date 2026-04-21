@@ -9,11 +9,11 @@
 
 namespace LiliumDB {
 
-//  magic bytes: CAT_CAFE LDB\0
+// magic bytes: CAT_CAFE LDB\0
 inline constexpr uint8_t MAGIC_BYTES[] = {0xCA, 0x70, 0xCA, 0xFE, 0x4C, 0x44, 0x42, 0x00};
 inline constexpr size_t MAGIC_BYTES_LEN = sizeof(MAGIC_BYTES) / sizeof(MAGIC_BYTES[0]);
 
-// checksum placeholder value
+// checksum placeholder value: SASSYCAT
 inline constexpr uint32_t CHECKSUM_PLACEHOLDER = 0xA71C555A;
 
 // current version is 0.0
