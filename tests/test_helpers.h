@@ -3,6 +3,7 @@
 
 #include "pager/pager.h"
 #include "pager/page_guard.h"
+#include "btree/btree_page.h"
 #include "utils/hexdump.h"
 
 #include <string_view>
@@ -28,7 +29,7 @@ void testHexDump(LiliumDB::Pager& pager, std::string_view testFileName) {
     std::string projectRoot = PROJECT_ROOT_STR;
     std::string testSuite = ::testing::UnitTest::GetInstance()->current_test_info()->test_suite_name();
     std::string testDirectory = projectRoot + "/debug/" + testSuite;
-    printf("project root: %s\n", testDirectory.c_str());
+    // printf("project root: %s\n", testDirectory.c_str());
 
     std::filesystem::create_directories(testDirectory);
 
@@ -46,6 +47,65 @@ void testHexDump(LiliumDB::Pager& pager, std::string_view testFileName) {
         auto page = std::move(r.value());
 
         hexdump(hexdumpFile, page.view(), i * LiliumDB::PAGE_SIZE, "Page " + std::to_string(i));
+    }
+}
+
+void logPageInfo(LiliumDB::Pager& pager,
+    std::string_view testFileName,
+    const std::string& insertKey,
+    int count) {
+    EXPECT_TRUE(pager.flushAll());
+
+    std::string projectRoot = PROJECT_ROOT_STR;
+    std::string testSuite = ::testing::UnitTest::GetInstance()->current_test_info()->test_suite_name();
+    std::string now = std::to_string(std::time(nullptr));
+    std::string testDirectory = projectRoot + "/debug/" + testSuite + "/page_log" + now + "/";
+
+    std::filesystem::create_directories(testDirectory);
+
+    std::string testName = ::testing::UnitTest::GetInstance()->current_test_info()->name();
+    std::string logPath = testDirectory + "/" + testName + "_" + std::to_string(count) + "_" + insertKey + ".log";
+
+    std::ofstream logFile(logPath);
+
+    logFile << testFileName << "\n" << "inserting: " << insertKey << "\n" << pager.pageCount() << " pages\n\n";
+    
+    for (int i = 0; i < pager.pageCount(); ++i) {
+        auto r = pager.fetchPage(i);
+        if (!r) continue;
+        auto page = std::move(r.value());
+        auto header = page.getHeader();
+        
+        logFile << "Page " << i << ":\n";
+        logFile << "  level: " << (int)header.level << "\n";
+        logFile << "  count: " << header.slotCount << "\n";
+        logFile << "  slots:\n";
+        
+        for (int s = 0; s < header.slotCount; ++s) {
+            auto slot = page.view().get<LiliumDB::Slot>(LiliumDB::slotOffset(s));
+            logFile << "    " << s << ": offset=" << slot.offset << " size=" << slot.size << "\n";
+        }
+        
+        logFile << "  keys:\n";
+        for (int s = 0; s < header.slotCount; ++s) {
+            auto slot = page.view().get<LiliumDB::Slot>(LiliumDB::slotOffset(s));
+            if (header.level > 0) {
+                auto kh = page.view().get<LiliumDB::KeyHeader>(slot.offset);
+                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::KeyHeader);
+                logFile << "    " << std::string(keyData, 2) << " -> page " << kh.childPage << "\n";
+            } else {
+                auto kv = page.view().get<LiliumDB::KeyValueHeader>(slot.offset);
+                auto keyData = (char*)page.view().data() + slot.offset + sizeof(LiliumDB::KeyValueHeader);
+                logFile << "    " << std::string(keyData, 2) << "\n";
+            }
+        }
+        if (header.level > 0) {
+            logFile << "  next -> page " << header.next << "\n";
+        } else {
+            logFile << "  next -> page " << header.next << "\n";
+            logFile << "  prev -> page " << header.prev << "\n";
+        }
+        logFile << "\n";
     }
 }
 
