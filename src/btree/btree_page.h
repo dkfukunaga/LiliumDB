@@ -44,6 +44,11 @@ static_assert(sizeof(KeyValueHeader) == KEY_VALUE_HEADER_SIZE);
 
 namespace LiliumDB::BTreePage {
 
+ByteView getKey(const PageGuard& page, SlotIndex index);
+ByteView getValue(const PageGuard& page, SlotIndex index);
+PageNum getChild(const PageGuard& page, SlotIndex index);
+void setChild(PageGuard& page, SlotIndex index, PageNum child);
+
 inline PageOffset slotOffset(SlotIndex index) noexcept {
     return static_cast<PageOffset>(PAGE_END_OFFSET - (index + 1) * sizeof(Slot));
 }
@@ -51,13 +56,15 @@ inline PageOffset slotOffset(int index) noexcept {
     return slotOffset(static_cast<SlotIndex>(index));
 }
 
-ByteView getKey(const PageGuard& page, SlotIndex index);
-ByteView getValue(const PageGuard& page, SlotIndex index);
-PageNum getChild(const PageGuard& page, SlotIndex index);
-void setChild(PageGuard& page, SlotIndex index, PageNum child);
+inline uint16_t entryFootprint(const PageGuard& page, SlotIndex index) {
+    auto slot = page.view().get<Slot>(slotOffset(index));
+    return slot.size + sizeof(Slot);
+}
 
 inline uint16_t freeSpace(const PageGuard& page) {
     auto header = page.getHeader();
+    if (header.slotCount == 0)
+        return page.usableSize();
     return slotOffset(header.slotCount - 1) - header.freeOffset;
 }
 
