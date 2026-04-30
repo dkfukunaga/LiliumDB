@@ -40,6 +40,8 @@ private:
 
     using MergeResult = std::optional<SlotIndex>;
 
+    enum Direction {fromLeft, fromRight};
+
     Pager& pager_;
     PageNum root_;
     PageType type_;
@@ -48,6 +50,7 @@ private:
     SlotIndex searchInner(PageGuard& page, ByteView key) const;
     SlotIndex searchLeaf(PageGuard& page, ByteView key) const;
     uint16_t compactPage(PageGuard& page);
+    void deleteEntry(PageGuard& page, SlotIndex index);
 
     void insertIntoLeaf(
         PageGuard& page,
@@ -82,9 +85,48 @@ private:
         ByteView key
     );
 
-    DbResult<void> mergeOrRedistribute(ParentStack&& stack);
-    DbResult<MergeResult> mergeLeaf(PageGuard& leftPage, PageGuard& rightPage);
-    DbResult<MergeResult> mergeInner(PageGuard& leftPage, PageGuard& rightPage);
+    DbResult<void> rebalance(ParentStack&& stack);
+    void mergePages(
+        PageGuard& leftPage,
+        PageGuard& rightPage,
+        bool isLeaf
+    );
+    bool takeFromSibling(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex,
+        Direction direction
+    );
+    bool takeFromLeft(
+        PageGuard& page,
+        PageGuard& leftSibling,
+        PageGuard& parent,
+        SlotIndex index
+    );
+    bool takeFromRight(
+        PageGuard& page,
+        PageGuard& rightSibling, 
+        PageGuard& parent,
+        SlotIndex index
+    );
+    bool rotateFromSibling(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex,
+        Direction direction
+    );
+    DbResult<std::optional<PageGuard>> getLeftSibling(
+        PageGuard& page,
+        PageGuard& parent,
+        SlotIndex index
+    );
+    DbResult<std::optional<PageGuard>> getRightSibling(
+        PageGuard& page,
+        PageGuard& parent,
+        SlotIndex index
+    );
 };
 
 } // namespace LiliumDB
