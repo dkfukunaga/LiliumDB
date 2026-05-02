@@ -102,7 +102,7 @@ TEST_F(LRUPagerTest, NewPagefetchPage) {
     ASSERT_EQ(footer.checksum, CHECKSUM_PLACEHOLDER);
 
     // close file
-    page.reset();
+    page.release();
     ASSERT_TRUE(pager->close());
 
     // reopen file
@@ -237,14 +237,14 @@ TEST_F(LRUPagerTest, DeletePage) {
     ASSERT_EQ(errResult.error().code(), Status::Code::InvalidArg);
 
     // reset PageGuard and then delete
-    page.reset();
+    page.release();
     ASSERT_TRUE(pager->deletePage(5));
 
     // delete page 4
     ASSERT_TRUE(pager->deletePage(4));
 
     // close pager
-    page.reset();
+    page.release();
     ASSERT_TRUE(pager->close());
 
     // reopen pager to inspect FileHeader

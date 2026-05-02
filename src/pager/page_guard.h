@@ -51,8 +51,8 @@ public:
     uint16_t    minOccupancy() const noexcept {
         return pageNum_ == 0 ? PAGE_ZERO_MIN_OCCUPANCY : PAGE_MIN_OCCUPANCY;
     }
-    /// Invaldates unpins the underlying page and invalidates PageGuard
-    void        reset();
+    /// Unpins the underlying page and invalidates PageGuard
+    void        release();
 
     PageGuard&  operator=(const PageGuard&) = delete;
     /// Unpins the current page and transfers ownership of the incoming pin.

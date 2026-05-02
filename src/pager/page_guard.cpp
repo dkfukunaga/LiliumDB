@@ -68,7 +68,7 @@ void PageGuard::setHeader(PageHeader header) {
     data_.put<PageHeader>(pageOffset(), header);
 }
 
-void PageGuard::reset() {
+void PageGuard::release() {
     if (pager_) {
         pager_->unpinPage(pageNum_);
     }
