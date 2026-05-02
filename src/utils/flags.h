@@ -5,8 +5,6 @@
 #include <initializer_list>
 #include <string>
 
-namespace LiliumDB {
-
 // Type-safe bitmask wrapper over an enum type.
 // Enum must be an enum (plain or enum class) with an explicit unsigned underlying
 // type. Stores flags in the enum's underlying integer type with no overhead.
@@ -176,7 +174,5 @@ private:
 
     static constexpr Int toInt(Enum flag) noexcept { return static_cast<Int>(flag); }
 };
-
-} // namespace LiliumDB
 
 #endif

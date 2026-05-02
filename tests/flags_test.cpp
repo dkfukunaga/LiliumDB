@@ -2,8 +2,6 @@
 
 #include "gtest/gtest.h"
 
-using namespace LiliumDB;
-
 enum class TestFlag : uint16_t {
     A = 0x01,
     B = 0x02,
