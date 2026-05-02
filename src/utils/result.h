@@ -6,8 +6,6 @@
 #include <type_traits>
 #include <cassert>
 
-namespace LiliumDB {
-
 // Ok and Err are tag types that wrap construction arguments to make the
 // success and error cases of Result explicit at the call site.
 //
@@ -120,7 +118,5 @@ public:
 private:
     std::variant<std::monostate, E> data_;
 };
-
-} // namespace LiliumDB
 
 #endif

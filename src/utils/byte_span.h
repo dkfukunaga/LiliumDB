@@ -9,8 +9,6 @@
 #include <iterator>     // std::reverse_iterator
 #include <vector>
 
-namespace LiliumDB {
-
 class ByteView;
 
 // Non-owning mutable view over a contiguous byte buffer.
@@ -229,7 +227,5 @@ inline bool operator==(ByteView lhs, ByteView rhs) {
 inline bool operator!=(ByteView lhs, ByteView rhs) {
     return !(lhs == rhs);
 }
-
-} // namespace LiliumDB
 
 #endif

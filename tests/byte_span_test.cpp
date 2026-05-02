@@ -5,8 +5,6 @@
 
 #include <gtest/gtest.h>
 
-using namespace LiliumDB;
-
 TEST(ByteSpanTest, Basic) {
     std::vector<uint8_t> data = {1, 2, 3, 4, 5};
     ByteSpan span(data.data(), data.size());

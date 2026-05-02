@@ -46,7 +46,7 @@ void testHexDump(LiliumDB::Pager& pager, std::string_view testFileName) {
         EXPECT_TRUE(r);
         auto page = std::move(r.value());
 
-        hexdump(hexdumpFile, page.view(), i * LiliumDB::PAGE_SIZE, "Page " + std::to_string(i));
+        LiliumDB::hexdump(hexdumpFile, page.view(), i * LiliumDB::PAGE_SIZE, "Page " + std::to_string(i));
     }
 }
 

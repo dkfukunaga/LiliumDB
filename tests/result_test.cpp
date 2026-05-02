@@ -3,8 +3,6 @@
 
 #include <gtest/gtest.h>
 
-using namespace LiliumDB;
-
 TEST(ResultTest, Basic) {
     auto r1 = Result<int, std::string>(Ok(42));
     EXPECT_TRUE(r1.isOk());
