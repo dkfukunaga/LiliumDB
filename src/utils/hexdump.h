@@ -7,15 +7,11 @@
 #include <cstdint>
 #include <string_view>
 
-namespace LiliumDB {
-
 void hexdump(
     std::ostream& out,
     const ByteView& view,
     uint64_t baseAddress = 0,
     std::string_view label = ""
 );
-
-} // namespace LiliumDB
 
 #endif // LILIUMDB_HEXDUMP_H

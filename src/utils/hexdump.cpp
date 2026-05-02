@@ -1,7 +1,5 @@
 #include "hexdump.h"
 
-namespace LiliumDB {
-
 void hexdump(std::ostream& out,
              const ByteView& view,
              uint64_t baseAddress,
@@ -122,5 +120,3 @@ void hexdump(std::ostream& out,
 
 
 }
-
-} // namespace LiliumDB
