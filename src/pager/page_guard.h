@@ -22,7 +22,7 @@ public:
         , data_()
         , dirty_(false) { }
     /// Pins the given page in the buffer pool.
-    PageGuard(PinManager* pager, PageNum pageNum, /*PageType pageType,*/ ByteSpan data);
+    PageGuard(PinManager* pager, PageNum pageNum, ByteSpan data);
     PageGuard(const PageGuard&) = delete;
     /// Transfers ownership of the pin; the moved-from guard becomes invalid.
     PageGuard(PageGuard&& other) noexcept;
@@ -31,7 +31,7 @@ public:
 
     /// Returns a mutable span over the page data and marks the page dirty.
     ByteSpan    span();
-    /// Returns a mutable span over a region the page data and marks the page dirty.
+    /// Returns a mutable subspan of the page data and marks the page dirty.
     /// ByteSpan throws std::out_of_range.
     ByteSpan    subspan(PageOffset start, uint16_t len);
     /// Returns a read-only view over the page data.
@@ -43,8 +43,12 @@ public:
     PageHeader  getHeader() const;
     void        setHeader(PageHeader header);
     PageNum     pageNum() const noexcept { return pageNum_; }
-    PageOffset  pageOffset() const noexcept { return pageNum_ == 0 ? PAGE_ZERO_OFFSET : 0; }
-    PageOffset  usableStart() const noexcept { return pageOffset() + sizeof(PageHeader); }
+    PageOffset  pageOffset() const noexcept {
+        return pageNum_ == 0 ? PAGE_ZERO_OFFSET : 0;
+    }
+    PageOffset  usableStart() const noexcept {
+        return pageOffset() + sizeof(PageHeader);
+    }
     uint16_t    usableSize() const noexcept {
         return pageNum_ == 0 ? PAGE_ZERO_USABLE_SIZE : PAGE_USABLE_SIZE;
     }
