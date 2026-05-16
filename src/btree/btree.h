@@ -36,11 +36,16 @@ private:
         PageNum                 leftChild;
         PageNum                 rightChild;
     };
+
+    struct Sibling {
+        PageGuard page;
+        int16_t surplus;
+
+        // Sibling(PageGuard p, int16_t s) : page(std::move(p)), surplus(s) { }
+    };
     // using MaybeSplit = std::optional<SplitResult>;
 
-    using MergeResult = std::optional<SlotIndex>;
-
-    enum Direction {fromLeft, fromRight};
+    // using MergeResult = std::optional<SlotIndex>;
 
     Pager& pager_;
     PageNum root_;
@@ -62,7 +67,7 @@ private:
         SlotIndex index,
         ByteView key,
         PageNum leftChild,
-        PageNum rightChild);
+        PageNum rightChild = INVALID_PAGE);
 
     DbResult<void> splitAndInsert(
         ParentStack&& stack,
@@ -86,46 +91,63 @@ private:
     );
 
     DbResult<void> rebalance(ParentStack&& stack);
-    void mergePages(
+    DbResult<std::optional<Sibling>> getLeftSibling(
+        const PageGuard& parent,
+        SlotIndex index
+    );
+    DbResult<std::optional<Sibling>> getRightSibling(
+        const PageGuard& parent,
+        SlotIndex index
+    );
+    bool shift(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex,
+        bool fromLeft
+    );
+    bool shiftRight(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex index
+    );
+    bool shiftLeft(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex index
+    );
+    bool rotate(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex,
+        bool fromLeft
+    );
+    bool rotateRight(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex
+    );
+    bool rotateLeft(
+        PageGuard& page,
+        PageGuard& sibling, 
+        PageGuard& parent,
+        SlotIndex separatorIndex
+    );
+    DbResult<void> mergeLeaf(
         PageGuard& leftPage,
         PageGuard& rightPage,
-        bool isLeaf
-    );
-    bool takeFromSibling(
-        PageGuard& page,
-        PageGuard& sibling, 
         PageGuard& parent,
-        SlotIndex separatorIndex,
-        Direction direction
+        SlotIndex separatorIndex
     );
-    bool takeFromLeft(
-        PageGuard& page,
-        PageGuard& leftSibling,
+    DbResult<bool> mergeInner(
+        PageGuard& leftPage,
+        PageGuard& rightPage,
         PageGuard& parent,
-        SlotIndex index
-    );
-    bool takeFromRight(
-        PageGuard& page,
-        PageGuard& rightSibling, 
-        PageGuard& parent,
-        SlotIndex index
-    );
-    bool rotateFromSibling(
-        PageGuard& page,
-        PageGuard& sibling, 
-        PageGuard& parent,
-        SlotIndex separatorIndex,
-        Direction direction
-    );
-    DbResult<std::optional<PageGuard>> getLeftSibling(
-        PageGuard& page,
-        PageGuard& parent,
-        SlotIndex index
-    );
-    DbResult<std::optional<PageGuard>> getRightSibling(
-        PageGuard& page,
-        PageGuard& parent,
-        SlotIndex index
+        SlotIndex separatorIndex
     );
 };
 

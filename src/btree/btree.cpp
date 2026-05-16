@@ -10,15 +10,11 @@ namespace LiliumDB {
 
 DbResult<void> BTree::insert(ByteView key, ByteView value) {
     BTree::ParentStack stack;
-    // printf("Searching for key %.2s ...\n    ", (char*)key.data());
     ASSIGN_OR_RETURN(stack, search(key));
-    // printf("Found!\n");
 
     PageGuard& page = stack.back().page;
     SlotIndex index = stack.back().index;
     PageHeader header = page.getHeader();
-
-    // printf("Inserting key %.2s into page %d at index %d ...\n    ", (char*)key.data(), page.pageNum(), index);
 
     uint16_t freeSpace = static_cast<uint16_t>(
         (PAGE_END_OFFSET - header.slotCount * sizeof(Slot)) - header.freeOffset);
@@ -44,9 +40,10 @@ DbResult<bool> BTree::remove(ByteView key) {
     BTree::ParentStack stack;
     ASSIGN_OR_RETURN(stack, search(key));
 
-    PageGuard page = std::move(stack.back().page);
+    // get a reference to the leaf page on top of the stack
+    PageGuard& page = stack.back().page;
+    // get leaf page's index in its parent page
     SlotIndex index = stack.back().index;
-    stack.pop_back();
 
     // check for empty tree
     if (index == INVALID_SLOT) {
@@ -65,6 +62,9 @@ DbResult<bool> BTree::remove(ByteView key) {
     deleteEntry(page, index);
 
     // call rebalance if page is now under minimum occupancy
+    if (usedSpace(page) < page.minOccupancy()) {
+        RETURN_ON_ERROR(rebalance(std::move(stack)));
+    }
 
     return Ok(true);
 }
@@ -120,11 +120,10 @@ DbResult<BTree::ParentStack> BTree::search(ByteView key) const {
     PageGuard page;
     ASSIGN_OR_RETURN(page, pager_.fetchPage(root_));
     PageHeader header = page.getHeader();
-    auto slotCount = header.slotCount;
     ParentStack stack;
     SlotIndex index = INVALID_SLOT;
 
-    if (slotCount == 0) {
+    if (header.level == INVALID_TREE_LEVEL) {
         header.level = 0;
         page.setHeader(header);
         stack.push_back({std::move(page), 0});
@@ -132,41 +131,41 @@ DbResult<BTree::ParentStack> BTree::search(ByteView key) const {
     }
 
     while (header.level > 0) {
-        // printf("searching inner page %d ...\n    ", page.pageNum());
         index = searchInner(page, key);
-        // printf("found index %d ", index);
         PageNum child = getChild(page, index);
-        // printf("child %d ...\n    ", child);
 
         stack.push_back({std::move(page), index});
         ASSIGN_OR_RETURN(page, pager_.fetchPage(child));
         header = page.getHeader();
     }
-    // printf("searching leaf page %d ...\n    ", page.pageNum());
     index = searchLeaf(page, key);
-    // printf("found index %d ...\n    ", index);
     stack.push_back({std::move(page), index});
     return Ok(std::move(stack));
 }
 
 SlotIndex BTree::searchInner(PageGuard& page, ByteView key) const {
+    auto header = page.getHeader();
+
+    // for rare cases of a root page with a single child
+    if (header.slotCount == 0) {
+        return 0;
+    }
+
+    // binary search of keys
     SlotIndex mid;
     SlotIndex low = 0;
-    SlotIndex high = page.getHeader().slotCount - 1;
+    SlotIndex high = header.slotCount - 1;
 
     while (low <= high) {
         mid = static_cast<SlotIndex>(low + (high - low) / 2);
-        // printf("low = %d mid = %d high = %d\n    ", low, mid, high);
         auto slot = page.view().get<Slot>(slotOffset(mid));
         auto keyHeader = page.view().get<KeyHeader>(slot.offset);
         auto slotKey = page.subview(slot.offset + sizeof(KeyHeader), keyHeader.keySize);
-        // auto slotKey = getKey(page, mid);
 
         auto comp = memcmp(key.data(), slotKey.data(), std::min(key.size(), slotKey.size()));
         if (comp == 0) {
             comp = (int) key.size() - (int) slotKey.size();
         }
-        // printf("comp = %d\n    ", comp);
         if (comp == 0) {
             return mid;
         } else if (comp < 0) {
@@ -252,8 +251,14 @@ uint16_t BTree::compactPage(PageGuard& page) {
 }
 
 void BTree::deleteEntry(PageGuard& page, SlotIndex index) {
-    // remove slot and adjust over slots in the slot table
     auto header = page.getHeader();
+
+    // update header.next for inner pages if index is last slot
+    if (header.level > 0 && index == header.slotCount - 1) {
+        header.next = getChild(page, index);
+    }
+
+    // remove slot and adjust over slots in the slot table
     for (SlotIndex i = index + 1; i < header.slotCount; ++i) {
         Slot slot = page.view().get<Slot>(slotOffset(i));
         page.span().put<Slot>(slotOffset(i - 1), slot);
@@ -307,12 +312,7 @@ void BTree::insertIntoInner(
 
     // relocate slots to make space for new slot
     for (int i = header.slotCount - 1; i >= static_cast<int>(index); --i) {
-        // Slot before = page.view().get<Slot>(slotOffset(i));
-        // printf("  shifting slot %d (offset=%d size=%d) to slot %d\n", i, before.offset, before.size, i+1);
         page.span().copy_within(slotOffset(i + 1), slotOffset(i), sizeof(Slot));
-        // Slot after = page.view().get<Slot>(slotOffset(i + 1));
-        // printf("      result: offset=%d size=%d\n", after.offset, after.size);
-        // printf("      slotOffset(0)=%d slotOffset(1)=%d\n", slotOffset(0), slotOffset(1));
     }
     page.span().put<Slot>(slotOffset(index), Slot{cellOffset, totalSize});
 
@@ -322,7 +322,9 @@ void BTree::insertIntoInner(
     page.setHeader(header);
 
     // update next pointer to point to right page
-    setChild(page, index + 1, rightChild);
+    if (rightChild != INVALID_PAGE) {
+        setChild(page, index + 1, rightChild);
+    }
 }
 
 DbResult<void> BTree::splitAndInsert(
@@ -438,8 +440,6 @@ DbResult<BTree::SplitResult> BTree::splitLeaf(
             splitIndex++;
         }
     }
-    // printf("splitLeaf: slotCount=%d, index=%d, splitIndex=%d, key=%.2s\n    ", slotCount, index, splitIndex, (char*)key.data());
-
 
     std::vector<uint8_t> separatorKey = logicalEntry(splitIndex).key;
 
@@ -645,30 +645,59 @@ DbResult<void> BTree::promoteRoot(
 }
 
 DbResult<void> BTree::rebalance(ParentStack&& stack) {
-    
+    // pop leaf page and separator index
+    PageGuard page = std::move(stack.back().page);
+    SlotIndex index = stack.back().index;
+    stack.pop_back();
+
+    // calculate deficit
+    uint16_t deficit = page.minOccupancy() - usedSpace(page);
+
+    // fetch siblings if they exist
+    std::optional<BTree::Sibling> leftSibling;
+    ASSIGN_OR_RETURN(leftSibling, getLeftSibling(stack.back().page, index));
+    std::optional<BTree::Sibling> rightSibling;
+    ASSIGN_OR_RETURN(rightSibling, getRightSibling(stack.back().page, index));
+
+    // try to redistribute and return if successful
+    if (leftSibling && leftSibling->surplus >= deficit) {
+        if (shiftRight(page, leftSibling->page, stack.back().page, index)) {
+            return Ok();
+        }
+    }
+    if (rightSibling && rightSibling->surplus >= deficit) {
+        if (shiftLeft(page, rightSibling->page, stack.back().page, index)) {
+            return Ok();
+        }
+    }
+
+    // try to merge and return if not possible
+    if (leftSibling && leftSibling->surplus <= deficit) {
+        RETURN_ON_ERROR(mergeLeaf(leftSibling->page, page, stack.back().page, index));
+    } else if (rightSibling && rightSibling->surplus <= deficit) {
+        RETURN_ON_ERROR(mergeLeaf(page, rightSibling->page, stack.back().page, index));
+    } else {
+        // if neither redistribution nor merging is possible, leave page underfilled
+        return Ok();
+    }
+
+    // unwind the parent stack and check if parent page now has a deficit
+
 }
 
-void BTree::mergePages(
-    PageGuard& leftPage,
-    PageGuard& rightPage,
-    bool isLeaf
-) {
-
-}
-
-bool BTree::takeFromSibling(
+bool BTree::shift(
     PageGuard& page,
     PageGuard& sibling, 
     PageGuard& parent,
     SlotIndex separatorIndex,
-    BTree::Direction direction
+    bool fromLeft
 ) {
     // check if the last entry of the left page is big enough to fill the
     // deficit without giving the left page a deficit
     uint16_t pageFreeSpace = freeSpace(page);
     uint16_t deficit = page.minOccupancy() - pageFreeSpace;
-    int16_t surplus = freeSpace(sibling) - sibling.minOccupancy();
-    SlotIndex entryIndex = direction == BTree::Direction::fromLeft
+    int16_t surplus = surplusSpace(sibling);
+    SlotIndex entryIndex = fromLeft
                            ? sibling.getHeader().slotCount - 1
                            : 0;
     uint16_t entrySize = entryFootprint(sibling, entryIndex);
@@ -687,25 +716,13 @@ bool BTree::takeFromSibling(
         return false;
     }
 
-    // set values depending on direction
-    SlotIndex insertIndex;
-    PageNum leftPageNum;
-    PageNum rightPageNum;
-    switch (direction) {
-        case BTree::Direction::fromLeft:
-            insertIndex = 0;
-            leftPageNum = sibling.pageNum();
-            rightPageNum = page.pageNum();
-            break;
-        case BTree::Direction::fromRight:
-            insertIndex = page.getHeader().slotCount;
-            leftPageNum = page.pageNum();
-            rightPageNum = sibling.pageNum();
-            break;
-    }
-
     // move entry from sibling to page
-    insertIntoLeaf(page, insertIndex, getKey(sibling, entryIndex), getValue(sibling, entryIndex));
+    insertIntoLeaf(
+        page,
+        (fromLeft ? 0 : page.getHeader().slotCount),
+        getKey(sibling, entryIndex),
+        getValue(sibling, entryIndex)
+    );
     deleteEntry(sibling, entryIndex);
     
     // remove old separator key from parent and insert new separator key
@@ -713,83 +730,238 @@ bool BTree::takeFromSibling(
     insertIntoInner(
         parent,
         separatorIndex,
-        getKey(page, 0),
-        leftPageNum,
-        rightPageNum
+        getKey((fromLeft ? page : sibling), 0),
+        (fromLeft ? sibling.pageNum() : page.pageNum())
     );
 
     return true;
 }
 
 // must check that left sibling exists before attempting to take from left
-bool BTree::takeFromLeft(
+bool BTree::shiftRight(
     PageGuard& page,
-    PageGuard& leftSibling,
+    PageGuard& sibling,
     PageGuard& parent,
     SlotIndex index
 ) {
-    return takeFromSibling(
+    return shift(
         page,
-        leftSibling,
+        sibling,
         parent,
         index - 1,
-        BTree::Direction::fromLeft
+        true
     );
 }
 
-bool BTree::takeFromRight(
+bool BTree::shiftLeft(
     PageGuard& page,
-    PageGuard& rightSibling, 
+    PageGuard& sibling, 
     PageGuard& parent,
     SlotIndex index
 ) {
-    return takeFromSibling(
+    return shift(
         page,
-        rightSibling,
+        sibling,
         parent,
         index,
-        BTree::Direction::fromRight
+        false
     );
 }
 
-bool BTree::rotateFromSibling(
+bool BTree::rotate(
     PageGuard& page,
     PageGuard& sibling, 
     PageGuard& parent,
     SlotIndex separatorIndex,
-    Direction direction
+    bool fromLeft
 ) {
+    // check if separator entry fits in page
+    uint16_t pageFreeSpace = freeSpace(page);
+    uint16_t deficit = page.minOccupancy() - pageFreeSpace;
+    uint16_t separatorSize = entryFootprint(parent, separatorIndex);
+    if (separatorSize < deficit || separatorSize > pageFreeSpace) {
+        return false;
+    }
 
+    // check if donor entry fits in parent and if moving donor
+    // will cause siblin got underflow
+    SlotIndex donorIndex = fromLeft
+                           ? sibling.getHeader().slotCount - 1
+                           : 0;
+    uint16_t donorSize = entryFootprint(sibling, donorIndex);
+    if ((donorSize > separatorSize && donorSize - separatorSize > freeSpace(parent))
+        || usedSpace(sibling) - donorSize < sibling.minOccupancy()) {
+        return false;
+    }
+
+    // insert new entry into page
+    PageGuard& leftPage = (fromLeft ? sibling : page);
+    insertIntoInner(
+        page,
+        (fromLeft ? 0 : page.getHeader().slotCount),
+        getKey(parent, separatorIndex),
+        leftPage.getHeader().next
+    );
+
+    // update separator key
+    auto newSeparatorKey = getKey(sibling, donorIndex);
+    deleteEntry(parent, separatorIndex);
+    insertIntoInner(
+        parent,
+        separatorIndex,
+        newSeparatorKey,
+        leftPage.pageNum()
+    );
+
+    // update leftpage.next
+    auto leftHeader = leftPage.getHeader();
+    leftHeader.next = getChild(sibling, donorIndex);
+    leftPage.setHeader(leftHeader);
+
+    // delete donated entry
+    deleteEntry(sibling, donorIndex);
+
+    return true;
 }
 
-DbResult<std::optional<PageGuard>> BTree::getLeftSibling(
+bool BTree::rotateRight(
     PageGuard& page,
+    PageGuard& sibling, 
     PageGuard& parent,
+    SlotIndex separatorIndex
+) {
+    return rotate(
+        page,
+        sibling,
+        parent,
+        separatorIndex - 1,
+        true
+    );
+}
+
+bool BTree::rotateLeft(
+    PageGuard& page,
+    PageGuard& sibling, 
+    PageGuard& parent,
+    SlotIndex separatorIndex
+) {
+    return rotate(
+        page,
+        sibling,
+        parent,
+        separatorIndex,
+        false
+    );
+}
+
+DbResult<void> BTree::mergeLeaf(
+    PageGuard& leftPage,
+    PageGuard& rightPage,
+    PageGuard& parent,
+    SlotIndex separatorIndex
+) {
+    // update leftPage.next
+    auto leftHeader = leftPage.getHeader();
+    auto rightHeader = rightPage.getHeader();
+    leftHeader.next = rightHeader.next;
+    leftPage.setHeader(leftHeader);
+
+    // move all entries from rightPage to leftPage
+    for (SlotIndex i = leftHeader.slotCount, j = 0; j < rightHeader.slotCount; ++i, ++j) {
+        insertIntoLeaf(leftPage, i, getKey(rightPage, j), getValue(rightPage, j));
+    }
+
+    // update rightPage.next.prev if it exists
+    if (rightHeader.next != INVALID_PAGE) {
+        PageGuard nextPage;
+        ASSIGN_OR_RETURN(nextPage, pager_.fetchPage(rightHeader.next));
+        auto nextHeader = nextPage.getHeader();
+        nextHeader.prev = leftPage.pageNum();
+        nextPage.setHeader(nextHeader);
+    }
+
+    // delete separator key from parent
+    deleteEntry(parent, separatorIndex);
+
+    // release rightPage and delete
+    auto rightPageNum = rightPage.pageNum();
+    rightPage.release();
+    RETURN_ON_ERROR(pager_.deletePage(rightPageNum));
+
+    return Ok();
+}
+
+DbResult<bool> BTree::mergeInner(
+    PageGuard& leftPage,
+    PageGuard& rightPage,
+    PageGuard& parent,
+    SlotIndex separatorIndex
+) {
+    // check if leftPage has sufficient freeSpace
+    auto leftFree = freeSpace(leftPage);
+    auto rightused = usedSpace(rightPage);
+    auto separatorSize = entryFootprint(parent, separatorIndex);
+    if (rightused + separatorSize > leftFree) {
+        return Ok(false);
+    }
+
+    // insert entry for separator key into leftpage
+    auto leftHeader = leftPage.getHeader();
+    insertIntoInner(leftPage, leftHeader.slotCount, getKey(parent, separatorIndex), leftHeader.next);
+
+    // delete separator key from parent and update child pointer for next slot
+    deleteEntry(parent, separatorIndex);
+    // separatorIndex is now the next slot after deleting the separator entry
+    setChild(parent, separatorIndex, leftPage.pageNum());
+
+    // move all entries from rightPage to leftPage
+    // adjusting slotcount after inserting the separator key
+    auto rightHeader = rightPage.getHeader();
+    for (SlotIndex i = leftHeader.slotCount + 1, j = 0; j < rightHeader.slotCount; ++i, ++j) {
+        insertIntoInner(leftPage, i, getKey(rightPage, j), getChild(rightPage, j));
+    }
+
+    // update leftPage.next
+    leftHeader = leftPage.getHeader(); // update stale leftHeader after insertion
+    leftHeader.next = rightHeader.next;
+    leftPage.setHeader(leftHeader);
+
+    // release rightPage and delete
+    auto rightPageNum = rightPage.pageNum();
+    rightPage.release();
+    RETURN_ON_ERROR(pager_.deletePage(rightPageNum));
+
+    return Ok(true);
+}
+
+DbResult<std::optional<BTree::Sibling>> BTree::getLeftSibling(
+    const PageGuard& parent,
     SlotIndex index
 ) {
     if (index == 0) {
-        return Ok(std::optional<PageGuard>());
+        return Ok(std::optional<BTree::Sibling>());
     }
 
-    auto siblingPageNum = getChild(parent, index - 1);
-    PageGuard sibling;
-    ASSIGN_OR_RETURN(sibling, pager_.fetchPage(siblingPageNum));
-    return Ok(std::optional<PageGuard>(std::move(sibling)));
+    auto pageNum = getChild(parent, index - 1);
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, pager_.fetchPage(pageNum));
+    Sibling sibling{std::move(page), surplusSpace(page)};
+    return Ok(std::optional<BTree::Sibling>(std::move(sibling)));
 }
 
-DbResult<std::optional<PageGuard>> BTree::getRightSibling(
-    PageGuard& page,
-    PageGuard& parent,
+DbResult<std::optional<BTree::Sibling>> BTree::getRightSibling(
+    const PageGuard& parent,
     SlotIndex index
 ) {
     if (index == parent.getHeader().slotCount) {
-        return Ok(std::optional<PageGuard>());
+        return Ok(std::optional<BTree::Sibling>());
     }
 
-    auto siblingPageNum = getChild(parent, index + 1);
-    PageGuard sibling;
-    ASSIGN_OR_RETURN(sibling, pager_.fetchPage(siblingPageNum));
-    return Ok(std::optional<PageGuard>(std::move(sibling)));
+    auto pageNum = getChild(parent, index + 1);
+    PageGuard page;
+    ASSIGN_OR_RETURN(page, pager_.fetchPage(pageNum));
+    Sibling sibling{std::move(page), surplusSpace(page)};
+    return Ok(std::optional<BTree::Sibling>(std::move(sibling)));
 }
 
 } // namespace LiliumDB
