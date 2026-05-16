@@ -69,7 +69,22 @@ inline uint16_t freeSpace(const PageGuard& page) {
 }
 
 inline uint16_t usedSpace(const PageGuard& page) {
-    return page.usableSize() - freeSpace(page);
+    auto header = page.getHeader();
+    if (header.slotCount == 0)
+        return 0;
+    uint16_t used = 0;
+    for (SlotIndex i = 0; i < header.slotCount; ++i) {
+        used += entryFootprint(page, i);
+    }
+    return used;
+}
+
+inline uint16_t unusedSpace(const PageGuard& page) {
+    return page.usableSize() - usedSpace(page);
+}
+
+inline int16_t surplusSpace(const PageGuard& page) {
+    return static_cast<int16_t>(unusedSpace(page) - page.minOccupancy());
 }
 
 } // namespace LiliumDB::BTreePage
