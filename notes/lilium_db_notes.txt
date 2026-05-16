@@ -1,12 +1,3 @@
-TODO:
-    - refactor StdPageIO to use the same factory pattern as LRUPager:
-        class StdPageIO : public PageIO {
-        public:
-            static Result<std::unique_ptr<StdPageIO>> open(std::string_view path, OpenMode mode);
-        private:
-            StdPageIO(/* internal args */);
-        };
-    - 
 
 
 
@@ -106,9 +97,12 @@ src/
         lru_pager.h             — LRU buffer pool implementation
         lru_pager.cpp
     btree/
-        btree_types.h           — RID, Slot
+        btree_page.h            — Slot, KeyHeader, KeyValueHeader, helper functions
+        btree_page.cpp
         btree.h                 — BTree (clustered primary + secondary index trees)
         btree.cpp
+        cursur.h                — Cursor for BTree entry traversal
+        cursur.cpp
     catalog/
         catalog.h               — Catalog interface
         system_catalog.h        — SystemCatalog (bootstraps SYS_TABLES, SYS_COLUMNS, etc.)
@@ -164,6 +158,7 @@ Edge cases:
 - Duplicate seek attempts on the same key
 
 
+
 splitAndInsert:
 - pop page from stack
 - splitLeaf and get back SplitResult{key, child}
@@ -178,6 +173,89 @@ splitAndInsert:
         - splitRoot
 - return Ok()
 
+
+rebalance:
+- rebalance leaf page:
+    - pop leaf page and index from stack
+    - peek parent page from stack
+    - try to redistribute:
+        - getLeftSibling
+        - if leftSibling and has surplus:
+            - if shiftRight:
+                - return Ok()
+        - getRightSibling
+        - if rightSibling and has surplus:
+            - if shiftLeft:
+                - return Ok()
+    - try to merge
+        - if leftSibling and surplus <= deficit:
+            - mergeLeaf
+            - return Ok()
+        - if rightSibling and surplus <= deficit:
+            - mergeLeaf
+            - return Ok()
+- while stack.size > 1
+    - pop page from stack
+    - if page has deficit
+        - peek parent page from stack
+        - try to rotate inner page
+            - if successful, return
+            - if can't, try to merge
+                - if can't, leave it be and return
+- pop root from stack
+- if slotCount == 0 (only one child)
+    - promote child to root
+
+redistribute checking:
+- leaf
+    - if has sibling:
+        - if separator key satisfies defiicit
+          and doesn't cause page to overflow
+          and donated key fits in parent
+          and doesn't cause sibling to underflow
+            - shift entry and return
+- inner
+    - if has sibling:
+        - if separator key size satisfies deficit
+          and doesn't cause page to overflow
+          and new separator key fits in parent
+          and sibling doesn't underflow
+            - insert separator key : sibling entry pointer into page
+            - remove separator key from parent
+            - insert new separator with appropriate pointer
+            - remove sibling entry
+
+
+- pop page from stack
+- check left sibling if it exists
+    - if its overage <= this page's underage
+        - merge pages
+    - else
+        - iterate through entries from the end to try to balance pages
+        - if still results in underage for either page, minimize underage and cache
+
+mergeLeaf:
+- insert entries from rightPage into leftPage
+- set leftPage.next to rightPage.next
+- if rightPage.next is not INVALID_PAGE
+    - set rightPage.next.prev to leftpage
+- remove the entry for leftPage from parent
+- if rightPage is parent.next
+    - set parent.next to leftPage
+- else
+    - update entry for rightPage to point to leftPage
+- delete rightPage
+
+mergeInner:
+- pull separator key from parent and add entry for separator -> leftPage.next
+- insert rightPage entries into leftPage
+- set leftPage.next to rightPage.next
+- remove the entry for leftPage from parent
+- if rightPage is parent.next
+    - set parent.next to leftPage
+- else
+    - update entry for rightPage to point to leftPage
+- delete rightPage
 
 
 
